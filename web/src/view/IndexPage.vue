@@ -16,9 +16,9 @@
         <div class="header-actions">
           <span class="save-status" role="status"><PlannerIcon :name="saving || loading ? 'clock' : 'saved'" />{{ saving ? '保存中' : loading ? '读取中' : error ? '保存状态异常' : auth.localMode ? '已保存至本地' : '已保存至账号' }}</span>
           <button class="icon-button" aria-label="统计" data-tip="统计" @click="openDialog('stats')"><PlannerIcon name="chart" /></button>
-          <button class="icon-button reminder-button" :class="{ enabled: reminderPermission === 'granted' }"
-            :aria-label="reminderControlLabel" :data-tip="reminderControlLabel" @click="enableReminders">
-            <PlannerIcon :name="reminderIcon" />
+          <button class="icon-button reminder-launcher" :class="{ enabled: reminderState.permission === 'granted' }"
+            aria-label="提醒中心" data-tip="提醒中心" @click="openReminderCenter">
+            <PlannerIcon :name="reminderState.permission === 'denied' ? 'bell-slash' : 'bell'" />
           </button>
           <router-link class="icon-button" to="/tools" aria-label="工具箱" data-tip="工具箱"><PlannerIcon name="more" /></router-link>
         </div>
@@ -249,33 +249,6 @@
       </div>
     </PlannerDialog>
 
-    <PlannerDialog :open="reminderOpen" title="到点提醒" @close="dismissReminders">
-      <div class="planner-form reminder-dialog">
-        <div class="reminder-lead">
-          <span class="reminder-lead-icon"><PlannerIcon name="bell" /></span>
-          <div><strong>{{ reminders.length === 1 ? '现在该处理这项任务了' : `现在有 ${reminders.length} 项任务到时间了` }}</strong><span>{{ dateCaptionFor(todayKey()) }}</span></div>
-        </div>
-        <ul class="reminder-list" aria-label="到点任务">
-          <li v-for="reminder in reminders" :key="reminderKey(todayKey(), reminder.task, reminder.period)">
-            <button type="button" class="reminder-task" @click="openReminderTask(reminder)">
-              <span><strong>{{ reminder.task.title }}</strong><small>{{ periodName(reminder.period || 'day') }}计划<i>·</i>{{ reminder.sectionTitle }}<i>·</i><span class="task-time">{{ taskTimeLabel(reminder.task) }}</span></small></span>
-              <PlannerIcon name="right" />
-            </button>
-            <button type="button" class="icon-button reminder-complete" :aria-label="`完成：${reminder.task.title}`"
-              title="标记完成" :disabled="saving" @click="completeReminder(reminder)"><PlannerIcon name="check" /></button>
-          </li>
-        </ul>
-        <p v-if="reminderPermission !== 'granted'" class="reminder-permission-note">
-          <PlannerIcon name="bell" />开启浏览器通知后，切到后台也能收到提醒
-        </p>
-        <footer class="dialog-footer">
-          <div class="dialog-footer-spacer"></div>
-          <button class="outline-button" type="button" @click="dismissReminders">稍后处理</button>
-          <button class="primary-button" type="button" @click="openReminderTask(reminders[0])"><PlannerIcon name="right" />查看事项</button>
-        </footer>
-      </div>
-    </PlannerDialog>
-
     <div v-if="toast" class="planner-toast" role="status"><PlannerIcon name="check" />{{ toast }}</div>
     <Teleport to="body">
       <div v-if="drag?.active" class="task-drag-preview" :class="{ 'no-drop-target': !dropTarget }" :style="dragPreviewStyle">
@@ -289,15 +262,16 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { auth } from '@/auth'
+import { openReminderCenter, reminderState } from '@/components/planner/reminders'
 import PlannerIcon from '@/components/planner/PlannerIcon.vue'
 import PlannerDialog from '@/components/planner/PlannerDialog.vue'
 import PlannerTaskRow from '@/components/planner/PlannerTaskRow.vue'
 import PlannerSchedule from '@/components/planner/PlannerSchedule.vue'
 import {
   clonePlan, dayKey, dropBeforeTask, dragScrollSpeed, moveTask, moveTaskBy, planCounts, planRequest, PlanRequestError,
-  dueReminderTasks, reminderKey, taskTimeLabel, shiftDay, validDay, weekDays,
+  shiftDay, validDay, weekDays,
   periodBounds, shiftPeriod, planPath, samePlan, validPeriod,
-  type DailyPlan, type DayCounts, type PlanColor, type PlanSection, type PlanTask, type PlannerReminder, type PlanPeriod
+  type DailyPlan, type DayCounts, type PlanColor, type PlanSection, type PlanTask, type PlanPeriod
 } from '@/components/planner/planner'
 
 const route = useRoute()
@@ -335,11 +309,6 @@ const tab = ref<'all' | 'todo'>('all')
 const layout = ref<'grid' | 'list'>('grid')
 const scheduleView = computed(() => route.query.view === 'schedule')
 const overview = ref<Record<string, DayCounts>>({})
-const reminderPlans = ref<DailyPlan[]>([])
-const reminders = ref<PlannerReminder[]>([])
-const reminderOpen = ref(false)
-type ReminderPermission = NotificationPermission | 'unsupported'
-const reminderPermission = ref<ReminderPermission>(typeof Notification === 'undefined' ? 'unsupported' : Notification.permission)
 const week = computed(() => weekDays(selectedDay.value))
 const weekNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
 const dateCaption = computed(() => {
@@ -347,13 +316,6 @@ const dateCaption = computed(() => {
   if (selectedPeriod.value === 'month') return `${Number(selectedDay.value.slice(0, 4))}年${Number(selectedDay.value.slice(5, 7))}月`
   if (selectedPeriod.value === 'year') return `${Number(selectedDay.value.slice(0, 4))}年`
   return `${bounds.value.start.replace(/-/g, '.')} - ${bounds.value.end.replace(/-/g, '.')}`
-})
-const reminderIcon = computed(() => reminderPermission.value === 'denied' ? 'bell-slash' : 'bell')
-const reminderControlLabel = computed(() => {
-  if (reminderPermission.value === 'granted') return '系统到点提醒已开启'
-  if (reminderPermission.value === 'denied') return '浏览器通知已关闭，页面弹窗仍可用'
-  if (reminderPermission.value === 'unsupported') return '使用页面弹窗提醒'
-  return '开启系统到点提醒'
 })
 const counts = computed(() => plan.value ? planCounts(plan.value) : { total: 0, done: 0 })
 const completion = computed(() => counts.value.total ? Math.round(counts.value.done / counts.value.total * 100) : 0)
@@ -368,12 +330,7 @@ const toast = ref('')
 let toastTimer: ReturnType<typeof setTimeout>
 let loadSequence = 0
 let overviewSequence = 0
-let reminderTimer: number | undefined
-let reminderLastChecked = new Date(Date.now() - 15_000)
-let reminderPlanRequest: Promise<DailyPlan[]> | null = null
-let reminderPlansLoadedAt = 0
-let reminderPlansDay = ''
-let reminderCheckInProgress = false
+let pendingPlanRefresh = false
 const taskForm = ref({ id: '', title: '', notes: '', time: '', endTime: '', scheduledDate: '', kind: 'task' as 'task' | 'event', done: false, daily: false, sectionId: '' })
 const taskStartInput = ref<HTMLInputElement | null>(null)
 const taskEndInput = ref<HTMLInputElement | null>(null)
@@ -434,7 +391,6 @@ async function loadDay(day: string, period: PlanPeriod = selectedPeriod.value) {
     const result = await planRequest<DailyPlan>(planPath(period, day))
     if (sequence !== loadSequence) return
     plan.value = result
-    updateReminderPlan(result)
     void loadOverview()
   } catch {
     if (sequence === loadSequence) {
@@ -442,7 +398,10 @@ async function loadDay(day: string, period: PlanPeriod = selectedPeriod.value) {
       error.value = '计划读取失败，请检查本地服务。'
     }
   } finally {
-    if (sequence === loadSequence) loading.value = false
+    if (sequence === loadSequence) {
+      loading.value = false
+      openLinkedTask()
+    }
   }
 }
 
@@ -487,142 +446,19 @@ function notify(message: string) {
   toast.value = message
   toastTimer = setTimeout(() => { toast.value = '' }, 2500)
 }
-async function enableReminders() {
-  if (reminderPermission.value === 'unsupported') {
-    notify('当前浏览器不支持系统通知，页面弹窗提醒仍会正常使用')
-    return
-  }
-  if (reminderPermission.value === 'granted') {
-    notify('系统到点提醒已开启，任务到时间会自动提醒')
-    return
-  }
-  if (reminderPermission.value === 'denied') {
-    notify('浏览器通知权限已关闭，页面内弹窗提醒仍会正常使用')
-    return
-  }
-  reminderPermission.value = await Notification.requestPermission()
-  notify(reminderPermission.value === 'granted'
-    ? '系统到点提醒已开启'
-    : '未开启系统通知，页面内弹窗提醒仍会正常使用')
-}
-function reminderStorageKeys() {
-  try {
-    const raw = localStorage.getItem('smarttodo-reminders-v1')
-    const values = raw ? JSON.parse(raw) : []
-    return new Set<string>(Array.isArray(values) ? values.filter(value => typeof value === 'string') : [])
-  } catch { return new Set<string>() }
-}
-function saveReminderStorageKeys(keys: Set<string>) {
-  try {
-    const values = [...keys].slice(-400)
-    localStorage.setItem('smarttodo-reminders-v1', JSON.stringify(values))
-  } catch { /* Private browsing can disable local storage. */ }
-}
-function systemNotify(entries: PlannerReminder[]) {
-  if (reminderPermission.value !== 'granted' || typeof Notification === 'undefined') return
-  const message = entries.length === 1
-    ? `${entries[0].sectionTitle} · ${taskTimeLabel(entries[0].task)}  ${entries[0].task.title}`
-    : `${entries[0].task.title} 等 ${entries.length} 项任务已到时间`
-  try {
-    const notification = new Notification('SmartTodo 到点提醒', { body: message, tag: `smarttodo-${todayKey()}` })
-    notification.onclick = () => {
-      window.focus()
-      notification.close()
-      if (reminders.value.length) reminderOpen.value = true
-    }
-  } catch { /* Keep the in-page reminder when system notifications are unavailable. */ }
-}
-function showPendingReminders() {
-  if (document.visibilityState === 'visible' && !dialog.value && !busy.value && !drag.value) reminderOpen.value = reminders.value.length > 0
-}
-function queueReminders(entries: PlannerReminder[]) {
-  const keys = reminderStorageKeys()
-  const fresh = entries.filter(entry => {
-    const key = reminderKey(todayKey(), entry.task, entry.period)
-    if (keys.has(key)) return false
-    keys.add(key)
-    return true
-  })
-  if (!fresh.length) return
-  saveReminderStorageKeys(keys)
-  reminders.value = [...reminders.value, ...fresh].filter((entry, index, all) =>
-    all.findIndex(item => reminderKey(todayKey(), item.task, item.period) === reminderKey(todayKey(), entry.task, entry.period)) === index)
-  if (document.visibilityState !== 'visible') systemNotify(fresh)
-  showPendingReminders()
-}
-function updateReminderPlan(saved: DailyPlan) {
-  const period = saved.period || 'day'
-  if (periodBounds(period, todayKey()).start !== saved.day) return
-  reminderPlans.value = [...reminderPlans.value.filter(item => !samePlan(item, saved)), saved]
-}
-async function ensureReminderPlans(): Promise<DailyPlan[]> {
-  const day = todayKey()
-  if (reminderPlansDay === day && Date.now() - reminderPlansLoadedAt < 30_000) return reminderPlans.value
-  if (!reminderPlanRequest) {
-    reminderPlanRequest = planRequest<DailyPlan[]>(`/agenda/${day}`)
-      .then(result => {
-        reminderPlans.value = result.map(item => {
-          const cached = reminderPlans.value.find(saved => samePlan(saved, item))
-          return cached && (cached.schedule_revision > item.schedule_revision || cached.revision > item.revision) ? cached : item
-        })
-        reminderPlansLoadedAt = Date.now()
-        reminderPlansDay = day
-        return reminderPlans.value
-      })
-      .catch(() => reminderPlans.value)
-      .finally(() => { reminderPlanRequest = null })
-  }
-  return reminderPlanRequest
-}
-async function checkReminders() {
-  if (reminderCheckInProgress) return
-  reminderCheckInProgress = true
-  const from = reminderLastChecked
-  const now = new Date()
-  reminderLastChecked = now
-  try {
-    const activePlans = await ensureReminderPlans()
-    const latestNow = new Date()
-    queueReminders(activePlans.flatMap(item => dueReminderTasks(item, from, latestNow)))
-    showPendingReminders()
-  } finally {
-    reminderCheckInProgress = false
-  }
-}
-function reminderVisibilityChanged() {
-  if (document.visibilityState === 'visible') {
-    void checkReminders()
-    showPendingReminders()
-  }
-}
-function dismissReminders() {
-  reminderOpen.value = false
-  reminders.value = []
-}
-async function openReminderTask(reminder?: PlannerReminder) {
-  if (!reminder) return
-  const day = todayKey()
-  const period = reminder.period || 'day'
-  dismissReminders()
-  if (selectedDay.value !== day || selectedPeriod.value !== period) {
-    void router.replace({ query: { ...route.query, date: day, period } })
-    await loadDay(day, period)
-  }
-  const section = plan.value?.sections.find(item => item.id === reminder.sectionId)
-  const task = section?.tasks.find(item => item.id === reminder.task.id)
+function openLinkedTask() {
+  const id = route.query.task
+  if (typeof id !== 'string' || busy.value || !plan.value || dialog.value) return
+  const section = plan.value.sections.find(item => item.tasks.some(task => task.id === id))
+  const task = section?.tasks.find(item => item.id === id)
   if (section && task) openTask(section, task)
+  else notify('这项任务已被删除或移动，请查看最新计划')
+  void router.replace({ query: { ...route.query, task: undefined } })
 }
-async function completeReminder(reminder: PlannerReminder) {
-  const source = reminderPlans.value.find(item => (item.period || 'day') === (reminder.period || 'day') && item.day === (reminder.planDay || todayKey()))
-  if (!source || saving.value) return
-  const next = clonePlan(source)
-  const task = next.sections.flatMap(section => section.tasks).find(item => item.id === reminder.task.id)
-  if (!task) return
-  task.done = true
-  if (await persistPlan(next, '事项已完成')) {
-    reminders.value = reminders.value.filter(item => reminderKey(todayKey(), item.task, item.period) !== reminderKey(todayKey(), reminder.task, reminder.period))
-    if (!reminders.value.length) reminderOpen.value = false
-  }
+function planUpdated() {
+  if (busy.value || dialog.value || drag.value) { pendingPlanRefresh = true; return }
+  pendingPlanRefresh = false
+  void loadDay(selectedDay.value)
 }
 function openDialog(type: DialogType) {
   if (busy.value || !plan.value) return
@@ -635,7 +471,7 @@ function closeDialog() {
   dialog.value = null
   modalError.value = ''
   confirmDelete.value = false
-  window.setTimeout(showPendingReminders, 0)
+  if (pendingPlanRefresh) planUpdated()
 }
 
 async function persistPlan(next: DailyPlan, message = ''): Promise<boolean> {
@@ -650,7 +486,7 @@ async function persistPlan(next: DailyPlan, message = ''): Promise<boolean> {
   try {
     const saved = await planRequest<DailyPlan>(path, { method: 'PUT', body: JSON.stringify(next) })
     if (selected) plan.value = saved
-    updateReminderPlan(saved)
+    window.dispatchEvent(new Event('planner-updated'))
     if ((saved.period || 'day') === 'day') overview.value[next.day] = planCounts(saved)
     void loadOverview()
     if (message) notify(message)
@@ -663,13 +499,16 @@ async function persistPlan(next: DailyPlan, message = ''): Promise<boolean> {
       try {
         const latest = await planRequest<DailyPlan>(path)
         if (selected) plan.value = latest
-        updateReminderPlan(latest)
+        window.dispatchEvent(new Event('planner-updated'))
       } catch { /* Keep the prior version on connection loss. */ }
     }
     error.value = message
     modalError.value = message
     return false
-  } finally { saving.value = false }
+  } finally {
+    saving.value = false
+    if (pendingPlanRefresh && !dialog.value) planUpdated()
+  }
 }
 async function persist(next: DailyPlan, message = '') {
   return persistPlan(next, message)
@@ -953,19 +792,17 @@ watch(() => [route.query.date, route.query.period], () => {
     void loadDay(day, period)
   }
 })
+watch(() => route.query.task, openLinkedTask)
 onMounted(() => {
   void loadDay(selectedDay.value)
   window.addEventListener('beforeunload', beforeUnload)
-  document.addEventListener('visibilitychange', reminderVisibilityChanged)
-  reminderTimer = window.setInterval(() => { void checkReminders() }, 15_000)
-  void checkReminders()
+  window.addEventListener('planner-updated', planUpdated)
 })
 onBeforeUnmount(() => {
   ++loadSequence
   ++overviewSequence
   clearTimeout(toastTimer)
-  if (reminderTimer !== undefined) window.clearInterval(reminderTimer)
-  document.removeEventListener('visibilitychange', reminderVisibilityChanged)
+  window.removeEventListener('planner-updated', planUpdated)
   cancelDrag()
   clearClickSuppression()
   window.removeEventListener('beforeunload', beforeUnload)

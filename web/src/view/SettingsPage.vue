@@ -37,6 +37,10 @@
           </fieldset>
         </form>
       </section>
+      <section class="account-section" aria-labelledby="reminders-title">
+        <div class="account-section-label"><PlannerIcon name="bell" /><h2 id="reminders-title">任务提醒</h2></div>
+        <ReminderPreferences />
+      </section>
       <section class="account-section" aria-labelledby="data-title">
         <div class="account-section-label"><PlannerIcon name="saved" /><h2 id="data-title">数据与设备</h2></div>
         <div class="account-data">
@@ -53,6 +57,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import PlannerIcon from '@/components/planner/PlannerIcon.vue'
+import ReminderPreferences from '@/components/planner/ReminderPreferences.vue'
 import { auth, authRequest, loadSession, signOut, type Account } from '@/auth'
 import type { PlanPeriod } from '@/components/planner/planner'
 

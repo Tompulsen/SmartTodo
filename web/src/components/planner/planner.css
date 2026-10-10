@@ -30,9 +30,9 @@
 .icon-button { position: relative; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 36px; height: 36px; border: 0; border-radius: 6px; background: transparent; color: #50585b; font-size: 15px; }
 .icon-button:hover { background: #e9eeee; }
 .icon-button.subtle { color: #919794; }
-.reminder-button { color: #7d8f83; }
-.reminder-button.enabled { color: #4f8062; background: #edf5ee; }
-.reminder-button:hover { color: #4f8062; background: #edf5ee; }
+.reminder-launcher { color: #7d8f83; }
+.reminder-launcher.enabled { color: #4f8062; background: #edf5ee; }
+.reminder-launcher:hover { color: #4f8062; background: #edf5ee; }
 .icon-button[data-tip]:hover::after { content: attr(data-tip); position: absolute; z-index: 30; bottom: calc(100% + 7px); left: 50%; transform: translateX(-50%); padding: 5px 8px; border-radius: 4px; color: white; background: #303837; white-space: nowrap; font-size: 11px; pointer-events: none; }
 .period-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 22px 0 18px; }
 .period-switch { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 4px; border: 1px solid #dce3e0; background: #eaf0ed; border-radius: 7px; width: 368px; max-width: 100%; }
@@ -192,24 +192,6 @@
 .task-drag-preview small { display: flex; align-items: center; gap: 6px; margin-top: 5px; font-size: 10px; line-height: 1.5; overflow-wrap: anywhere; }
 .task-drag-preview.no-drop-target { opacity: .7; border-style: dashed; }
 .planner-toast { position: fixed; bottom: 32px; left: calc(50% + 44px); transform: translateX(-50%); z-index: 160; border: 1px solid #d6e2d9; background: #fff; color: #435e4d; padding: 12px 20px; border-radius: 7px; box-shadow: 0 4px 18px #20322a14; font-size: 12px; display: flex; align-items: center; gap: 10px; max-width: 85vw; }
-.reminder-dialog { gap: 16px; }
-.reminder-lead { display: flex; align-items: center; gap: 13px; padding: 2px 0 8px; }
-.reminder-lead-icon { display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 42px; border-radius: 50%; color: #a14654; background: #fbe2df; font-size: 17px; }
-.reminder-lead strong { display: block; color: #3d5143; font-size: 14px; line-height: 1.5; }
-.reminder-lead span:not(.reminder-lead-icon) { display: block; margin-top: 3px; color: #89958b; font-size: 11px; }
-.reminder-list { display: flex; flex-direction: column; gap: 8px; list-style: none; padding: 0; margin: 0; }
-.reminder-list li { display: flex; align-items: stretch; gap: 6px; border: 1px solid #e3ebe4; border-radius: 7px; background: #fbfdfb; overflow: hidden; }
-.reminder-task { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex: 1; min-width: 0; padding: 12px 13px; border: 0; background: transparent; text-align: left; color: #3d5143; }
-.reminder-task:hover { background: #f1f7f2; }
-.reminder-task > span { min-width: 0; }
-.reminder-task strong { display: block; overflow-wrap: anywhere; font-size: 13px; line-height: 1.5; }
-.reminder-task small { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin-top: 3px; color: #89958b; font-size: 10px; }
-.reminder-task small i { color: #bdc8be; font-style: normal; }
-.reminder-task > svg { flex: 0 0 auto; color: #98a99b; font-size: 11px; }
-.reminder-complete { width: 44px; height: auto; border-left: 1px solid #e3ebe4; border-radius: 0; color: #6f947a; }
-.reminder-complete:hover { background: #e4f1e5; color: #42624c; }
-.reminder-permission-note { display: flex; align-items: center; gap: 7px; margin: 0; color: #849388; font-size: 10px; line-height: 1.6; }
-.reminder-permission-note svg { color: #6f947a; }
 .planner-dialog { border: 1.5px solid #62746a; border-radius: 8px; width: 480px; max-width: calc(100vw - 28px); max-height: calc(100dvh - 32px); padding: 0; overflow-y: auto; color: #354239; background: #fff; box-shadow: 4px 6px 0 #71847922; font: 13px "Microsoft YaHei", "PingFang SC", system-ui, sans-serif; }
 .planner-dialog::backdrop { background: #1d302b5e; backdrop-filter: blur(2px); }
 .dialog-content { padding: 24px 26px 22px; }
@@ -280,7 +262,7 @@
   .brand-word { font-size: 23px; }
   .header-actions { gap: 8px; }
   .save-status { font-size: 10px; }
-  .reminder-button { width: 33px; height: 33px; }
+  .reminder-launcher { width: 33px; height: 33px; }
   .period-toolbar { padding: 16px 0 14px; gap: 12px; }
   .period-switch { width: 300px; }
   .period-switch button { padding: 0 8px; min-height: 40px; font-size: 13px; }
@@ -345,8 +327,6 @@
   .mobile-fab { position: fixed; bottom: calc(86px + env(safe-area-inset-bottom)); right: 20px; display: grid; place-items: center; width: 53px; height: 53px; border-radius: 50%; border: 2px solid #3f4944; background: #f6978b; box-shadow: 2px 3px 0 #2c3c3218; z-index: 25; font-size: 25px !important; }
   .mobile-fab:hover { background: #f28578; }
   .planner-toast { left: 50%; bottom: calc(83px + env(safe-area-inset-bottom)); font-size: 11px; padding: 11px 16px; }
-  .reminder-lead strong { font-size: 13px; }
-  .reminder-task { padding: 12px 10px; }
   .list-layout .plan-task { grid-template-columns: 20px 22px minmax(0, 1fr) 30px; }
   .list-layout .section-count { display: inline-flex; }
   .list-layout .quadrant { min-height: 135px; }

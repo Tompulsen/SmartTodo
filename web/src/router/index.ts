@@ -24,6 +24,7 @@ const router = createRouter({
     { path: '/', redirect: '/index' },
     { path: '/index', component: Index },
     { path: '/tools', component: ToolsPage },
+    { path: '/environment', component: () => import('@/view/EnvironmentPage.vue') },
     { path: '/connect', component: ConnectionsPage },
     { path: '/login', component: Login },
     { path: '/register', component: Login },

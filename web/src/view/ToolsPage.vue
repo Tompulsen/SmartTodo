@@ -35,7 +35,8 @@ const tools = computed(() => [
   { title: '打卡记录', path: '/checkin', icon: 'complete', description: '每日习惯与坚持' },
   { title: '今日数据', path: '/summary/today', icon: 'grid', description: '回顾今天的安排' },
   { title: '长期数据', path: '/summary/longterm', icon: 'chart', description: '查看长期积累' },
-  ...(auth.user?.isAdmin ? [{ title: '系统日志', path: '/log', icon: 'list', description: '运行状态与事件' }] : [])
+  ...(auth.user?.isAdmin ? [{ title: '系统日志', path: '/log', icon: 'list', description: '运行状态与事件' }] : []),
+  { title: '环境舒适度', path: '/environment', icon: 'cloud-sun', description: '今日天气、体感与位置共享' }
 ])
 onMounted(async () => {
   try {

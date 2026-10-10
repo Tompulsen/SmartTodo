@@ -9,7 +9,9 @@ import {
   faCircle, faRotateRight, faCloudArrowDown, faNoteSticky, faBullseye, faCircleCheck, faRepeat,
   faBell, faBellSlash, faPlay, faPause, faStop, faLeaf, faVolumeHigh, faVolumeXmark, faLink, faMinus,
   faMusic, faArrowUpFromBracket, faPowerOff, faUser, faLock, faEye, faEyeSlash, faRightFromBracket, faShieldHalved,
-  faComments, faUserPlus, faPaperPlane, faMagnifyingGlass, faChevronDown
+  faComments, faUserPlus, faPaperPlane, faMagnifyingGlass, faChevronDown,
+  faSun, faMoon, faCloudSun, faCloud, faCloudRain, faCloudBolt, faSnowflake, faSmog,
+  faLocationDot, faLocationCrosshairs, faDroplet, faWind, faTemperatureHalf, faMapLocationDot
 } from '@fortawesome/free-solid-svg-icons'
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core'
 
@@ -25,6 +27,9 @@ const icons: Record<string, IconDefinition> = {
   leaf: faLeaf, sound: faVolumeHigh, mute: faVolumeXmark, link: faLink, minus: faMinus,
   music: faMusic, upload: faArrowUpFromBracket, power: faPowerOff,
   user: faUser, lock: faLock, eye: faEye, 'eye-slash': faEyeSlash, logout: faRightFromBracket, shield: faShieldHalved,
-  chat: faComments, 'user-plus': faUserPlus, send: faPaperPlane, search: faMagnifyingGlass, 'chevron-down': faChevronDown
+  chat: faComments, 'user-plus': faUserPlus, send: faPaperPlane, search: faMagnifyingGlass, 'chevron-down': faChevronDown,
+  sun: faSun, moon: faMoon, 'cloud-sun': faCloudSun, cloud: faCloud, rain: faCloudRain,
+  storm: faCloudBolt, snow: faSnowflake, mist: faSmog, location: faLocationDot,
+  locate: faLocationCrosshairs, humidity: faDroplet, wind: faWind, temperature: faTemperatureHalf, map: faMapLocationDot
 }
 </script>

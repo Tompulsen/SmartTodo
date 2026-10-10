@@ -24,21 +24,27 @@
         <button type="submit" class="account-secondary" :disabled="loading"><PlannerIcon name="refresh" />查询</button>
       </form>
       <div class="admin-results" aria-live="polite"><h2>用户列表 <span>{{ total }}</span></h2><span>{{ loading ? '加载中…' : `第 ${page} / ${pages} 页` }}</span></div>
+      <p class="admin-location-note"><PlannerIcon name="location" />位置来自用户使用环境舒适度时的设备上报；后台或锁屏可能暂停更新。</p>
+      <p v-if="locationError" class="account-error" role="alert">{{ locationError }}</p>
       <div class="admin-table-wrap" :aria-busy="loading">
         <table class="admin-table">
-          <thead><tr><th scope="col">用户</th><th scope="col">角色</th><th scope="col">状态</th><th scope="col">注册日期</th><th scope="col">操作</th></tr></thead>
+          <thead><tr><th scope="col">用户</th><th scope="col">角色</th><th scope="col">状态</th><th scope="col">注册日期</th><th scope="col">位置</th><th scope="col">操作</th></tr></thead>
           <tbody>
             <tr v-for="user in users" :key="user.username">
               <td class="admin-user-cell"><strong>{{ user.displayName }}</strong><span>@{{ user.username }}<small v-if="user.username === auth.user?.username">当前账号</small></span></td>
               <td data-label="角色"><span class="admin-role" :class="{ 'is-admin': user.isAdmin }">{{ user.isAdmin ? '管理员' : '普通用户' }}</span></td>
               <td data-label="状态"><span class="admin-status" :class="{ 'is-disabled': !user.active }"><i aria-hidden="true"></i>{{ user.active ? '正常' : '已停用' }}</span></td>
               <td data-label="注册日期" class="admin-date">{{ formatDate(user.createdAt) }}</td>
+              <td data-label="位置" class="admin-location-cell">
+                <span :class="{ 'location-live': locations[user.username]?.status === 'live' }">{{ locationLabel(locations[user.username]?.status) }}</span>
+                <button v-if="locations[user.username]?.position" type="button" class="admin-location-link" :aria-label="`查看 ${user.username} 的位置`" @click="openLocation(user.username)"><PlannerIcon name="map" />查看位置</button>
+              </td>
               <td class="admin-edit-cell">
                 <router-link v-if="user.username === auth.user?.username" to="/settings" class="account-secondary"><PlannerIcon name="settings" />个人设置</router-link>
                 <button v-else type="button" class="account-secondary" :disabled="loading" :aria-label="`编辑用户 ${user.username}`" @click="openEditor(user)"><PlannerIcon name="edit" />编辑</button>
               </td>
             </tr>
-            <tr v-if="!users.length"><td colspan="5" class="admin-empty">{{ loading ? '正在读取用户…' : error ? '暂时无法读取用户列表' : '没有匹配的用户' }}</td></tr>
+            <tr v-if="!users.length"><td colspan="6" class="admin-empty">{{ loading ? '正在读取用户…' : error ? '暂时无法读取用户列表' : '没有匹配的用户' }}</td></tr>
           </tbody>
         </table>
       </div>
@@ -50,6 +56,22 @@
           <button class="account-secondary admin-icon-button" type="button" title="下一页" aria-label="下一页" :disabled="loading || page >= pages" @click="loadUsers(page + 1)"><PlannerIcon name="right" /></button>
         </div>
       </nav>
+      <dialog ref="locationDialog" class="admin-dialog admin-location-dialog" aria-labelledby="admin-location-title" @close="selectedLocationUser = ''">
+        <header class="admin-dialog-heading"><div><p class="account-eyebrow">@{{ selectedLocationUser }}</p><h2 id="admin-location-title">用户位置</h2></div><button type="button" class="account-secondary admin-icon-button" title="关闭" aria-label="关闭用户位置" @click="locationDialog?.close()"><PlannerIcon name="close" /></button></header>
+        <template v-if="selectedLocation?.position">
+          <p class="admin-location-state" :class="{ 'location-live': selectedLocation.status === 'live' }"><PlannerIcon name="location" />{{ locationLabel(selectedLocation.status) }}</p>
+          <dl class="admin-location-details">
+            <div><dt>纬度 / 经度</dt><dd>{{ selectedLocation.position.latitude.toFixed(6) }} / {{ selectedLocation.position.longitude.toFixed(6) }}</dd></div>
+            <div><dt>定位精度</dt><dd>约 {{ Math.round(selectedLocation.position.accuracy) }} 米</dd></div>
+            <div><dt>设备采集时间</dt><dd>{{ locationTime(selectedLocation.position.capturedAt) }}</dd></div>
+            <div><dt>服务器接收时间</dt><dd>{{ locationTime(selectedLocation.position.receivedAt) }}</dd></div>
+          </dl>
+          <iframe v-if="showMap" :src="mapUrl" title="用户上报位置的 OpenStreetMap 地图" class="admin-location-map" referrerpolicy="no-referrer"></iframe>
+          <button v-else type="button" class="account-secondary" @click="showMap = true"><PlannerIcon name="map" />在地图中查看</button>
+          <p class="admin-location-note">地图由 OpenStreetMap 提供。{{ selectedLocation.status === 'live' ? '本页约每 15 秒检查一次最新上报。' : '这是最后一次上报的位置，不代表用户当前所在位置。' }}</p>
+        </template>
+        <p v-else class="account-caption" role="status">{{ locationError || (selectedLocation?.status === 'expired' ? '位置已过期，等待用户重新使用环境舒适度。' : '当前没有可查看的位置，用户可能已经退出环境舒适度。') }}</p>
+      </dialog>
       <dialog ref="dialog" class="admin-dialog" aria-labelledby="admin-edit-title" @cancel="cancelDialog" @click="backdropClose">
         <template v-if="editing">
           <header class="admin-dialog-heading"><div><p class="account-eyebrow">@{{ editing.username }}</p><h2 id="admin-edit-title">编辑用户</h2></div><button type="button" class="account-secondary admin-icon-button" title="关闭" aria-label="关闭编辑用户" :disabled="saving" @click="closeEditor"><PlannerIcon name="close" /></button></header>
@@ -78,7 +100,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { auth, authRequest, loadSession } from '@/auth'
 import PlannerIcon from '@/components/planner/PlannerIcon.vue'
@@ -93,6 +115,11 @@ interface ManagedUser {
   createdAt: string
 }
 interface UserList { users: ManagedUser[]; total: number; page: number; pageSize: number }
+interface UserLocation {
+  username: string
+  status: string
+  position: null | { latitude: number; longitude: number; accuracy: number; capturedAt: string; receivedAt: string }
+}
 const router = useRouter()
 const users = ref<ManagedUser[]>([])
 const total = ref(0)
@@ -112,6 +139,55 @@ const dialog = ref<HTMLDialogElement>()
 const editorAlert = ref<HTMLElement>()
 const editorError = ref('')
 const editorNotice = ref('')
+const locations = ref<Record<string, UserLocation>>({})
+const locationError = ref('')
+const locationDialog = ref<HTMLDialogElement>()
+const selectedLocationUser = ref('')
+const showMap = ref(false)
+const selectedLocation = computed(() => locations.value[selectedLocationUser.value])
+let locationVersion = 0
+let locationTimer: ReturnType<typeof setInterval> | undefined
+let disposed = false
+const mapUrl = computed(() => {
+  const position = selectedLocation.value?.position
+  if (!position) return ''
+  const { latitude: lat, longitude: lon } = position
+  const params = new URLSearchParams({
+    bbox: [Math.max(-180, lon - .015), Math.max(-85, lat - .01), Math.min(180, lon + .015), Math.min(85, lat + .01)].join(','),
+    layer: 'mapnik', marker: `${lat},${lon}`
+  })
+  return `https://www.openstreetmap.org/export/embed.html?${params}`
+})
+function locationLabel(status?: string) {
+  return ({ live: '最近更新', stale: '最后位置', expired: '位置已过期', waiting: '等待定位', not_shared: '未在使用', disabled: '账号停用' } as Record<string, string>)[status || ''] || '正在读取'
+}
+function locationTime(value: string) { return new Date(value).toLocaleString('zh-CN', { hour12: false }) }
+async function openLocation(username: string) {
+  selectedLocationUser.value = username
+  showMap.value = false
+  await nextTick()
+  locationDialog.value?.showModal()
+}
+async function loadLocations() {
+  const names = users.value.map(user => user.username)
+  if (!names.length || document.hidden || disposed) return
+  const version = ++locationVersion
+  try {
+    const result = await authRequest<{ locations: UserLocation[] }>(`/api/admin/locations?${new URLSearchParams({ users: names.join(',') })}`)
+    if (version !== locationVersion || disposed) return
+    locations.value = Object.fromEntries(result.locations.map(item => [item.username, item]))
+    locationError.value = ''
+  } catch (failure) {
+    if (version !== locationVersion || disposed) return
+    locations.value = {}
+    locationError.value = failure instanceof Error ? failure.message : '位置读取失败。'
+    await checkAccess()
+  }
+}
+function locationVisibilityChanged() {
+  if (document.hidden) { ++locationVersion; locations.value = {} }
+  else void loadLocations()
+}
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(value))
@@ -120,6 +196,7 @@ async function checkAccess() {
   await loadSession()
   if (auth.localMode || !auth.user?.isAdmin) {
     dialog.value?.close()
+    locationDialog.value?.close()
     await router.replace(auth.user ? '/tools' : '/login')
     return false
   }
@@ -128,6 +205,8 @@ async function checkAccess() {
 async function loadUsers(targetPage = page.value) {
   if (loading.value) return
   loading.value = true
+  ++locationVersion
+  locations.value = {}
   error.value = ''
   try {
     const params = new URLSearchParams({ q: query.value.trim(), role: role.value, status: status.value, page: String(targetPage) })
@@ -135,6 +214,7 @@ async function loadUsers(targetPage = page.value) {
     users.value = result.users
     total.value = result.total
     page.value = result.page
+    void loadLocations()
   } catch (failure) {
     error.value = failure instanceof Error ? failure.message : '读取用户失败。'
     await checkAccess()
@@ -200,7 +280,17 @@ async function resetPassword() {
     if (await checkAccess()) { await nextTick(); editorAlert.value?.focus() }
   } finally { saving.value = false }
 }
-onMounted(() => { void loadUsers() })
+onMounted(() => {
+  void loadUsers()
+  locationTimer = setInterval(() => { if (!loading.value) void loadLocations() }, 15000)
+  document.addEventListener('visibilitychange', locationVisibilityChanged)
+})
+onUnmounted(() => {
+  disposed = true
+  ++locationVersion
+  clearInterval(locationTimer)
+  document.removeEventListener('visibilitychange', locationVisibilityChanged)
+})
 </script>
 
 <style src="@/components/account/account.css"></style>
@@ -213,7 +303,8 @@ onMounted(() => { void loadUsers() })
 .admin-table-wrap { min-width: 0; }
 .admin-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 14px; }
 .admin-table th { text-align: left; color: #586d60; font-weight: 500; font-size: 12px; background: #eaf0ec; padding: 12px 16px; }
-.admin-table th:first-child { width: 31%; }
+.admin-table th:first-child { width: 23%; }
+.admin-table th:nth-child(5) { width: 130px; }
 .admin-table th:last-child { width: 140px; }
 .admin-table td { padding: 18px 16px; border-bottom: 1px solid #dbe3df; overflow-wrap: anywhere; vertical-align: middle; }
 .admin-user-cell strong { display: block; font-size: 15px; font-weight: 600; }
@@ -242,6 +333,19 @@ onMounted(() => { void loadUsers() })
 .admin-dialog-actions { display: flex; justify-content: flex-end; gap: 12px; }
 .admin-password-form { padding-top: 22px; margin-top: 24px; border-top: 1px solid #dbe3df; }
 .admin-password-form h3 { font-size: 15px; margin: 0; }
+.admin-screen > .account-content { max-width: 1100px; }
+.admin-location-note { color: #62756a; font-size: 12px; margin: 12px 0 20px; }
+.admin-location-note > svg { margin-right: 6px; }
+.admin-location-cell > span { font-size: 12px; color: #687c70; }
+.admin-location-link { border: 0; padding: 6px 0; background: none; color: #2b7380; font-size: 12px !important; min-height: 44px; display: flex; align-items: center; gap: 6px; text-decoration: underline; text-underline-offset: 4px; }
+.location-live { color: #2a7b58 !important; }
+.admin-location-dialog { width: 600px; }
+.admin-location-state { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.admin-location-details { display: grid; gap: 12px; font-size: 13px; padding: 18px 0; border-block: 1px solid #e1e8e3; }
+.admin-location-details > div { display: flex; gap: 16px; justify-content: space-between; flex-wrap: wrap; }
+.admin-location-details dt { color: #65786c; }
+.admin-location-details dd { margin: 0; overflow-wrap: anywhere; }
+.admin-location-map { display: block; width: 100%; height: 280px; border: 1px solid #d4dfd8; margin-top: 20px; border-radius: 6px; }
 @media (max-width: 700px) {
   .admin-toolbar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
   .admin-search { grid-column: 1 / -1; }
@@ -251,6 +355,8 @@ onMounted(() => { void loadUsers() })
   .admin-table tr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px 16px; padding: 18px 0; border-bottom: 1px solid #dbe3df; }
   .admin-table td { display: block; border: 0; padding: 4px 0; min-width: 0; }
   .admin-user-cell { grid-column: 1 / -1; }
+  .admin-location-cell { grid-column: 1 / -1; }
+  .admin-location-link { display: inline-flex; margin-left: 16px; }
   .admin-table td[data-label]::before { content: attr(data-label); font-size: 12px; color: #63776a; margin-right: 12px; }
   .admin-edit-cell { display: flex !important; justify-content: flex-end; align-items: center; }
   .admin-table .admin-empty { grid-column: 1 / -1; display: grid; place-items: center; }

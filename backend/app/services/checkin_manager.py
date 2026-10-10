@@ -1,0 +1,210 @@
+import random
+from collections.abc import Sequence
+from datetime import date, datetime, timedelta
+
+import sqlalchemy as sal
+
+from app.models.event import CheckinState, EventLog
+from app.models.weight import WeightLog
+from app.services.config_manager import ConfigManager
+from app.services.item_manager import ItemManager
+from app.tools.log import logger
+from app.tools.time import get_month_bounds, now, the_month_begin, today, today_begin
+
+icon_map = {"运动": "🏃🏻‍♀️", "早起": "🛏", "琴": "🎵", "体重": "🏋"}
+
+normal_emoji = [
+    "✅",
+    "⏳",
+    "📅",
+    "⏰",
+    "🔔",
+    "📊",
+    "🏆",
+    "⭐",
+    "❌",
+    "✏️",
+    "🌟",
+    "🎯",
+    "🔄",
+    "📌",
+    "🗓️",
+    "⏲️",
+    "🔥",
+    "💡",
+    "📝",
+    "🧩",
+    "🧘",
+    "🎲",
+    "🧭",
+    "🫧",
+    "🔁",
+]
+
+# 连续完成21天打卡可以获得一次补卡机会
+MAKE_UP_DAYS = 21
+
+
+class CheckinManager:
+    def __init__(self, config_manager: ConfigManager, item_manager: ItemManager) -> None:
+        self.db = item_manager.db
+        self.item_manager = item_manager
+        self.config_manager = config_manager
+        self._data_sources = [
+            self._event_log_source,
+            self._weight_log_source,
+        ]
+
+    def _get_checkin_item_names(self, owner: str) -> set[str]:
+        names = set(self.item_manager.select_checkin_item(owner))
+        stmt = sal.select(WeightLog.id).where(WeightLog.owner == owner).limit(1)
+        if self.db.scalar(stmt) is not None:
+            names.add("每日体重打卡")
+        return names
+
+    def get_all_data(self, owner: str):
+        names = self._get_checkin_item_names(owner)
+        start = the_month_begin()
+        end = now()
+        return {name: self.get_data(name, start, end, owner) for name in names}
+
+    def get_month_data(self, name: str, month: datetime, owner: str) -> list[str]:
+        start, end = get_month_bounds(month)
+        record = self.get_checkin_datetime(name, start, end, owner)
+        return [r.strftime("%Y-%m-%d %H:%M:%S") for r in record]
+
+    def get_data(self, name: str, start: datetime, end: datetime, owner: str) -> dict:
+        record = self.get_checkin_datetime(name, start, end, owner)
+        emoji = self.get_emoji(name)
+        return {"record": [r.strftime("%Y-%m-%d %H:%M:%S") for r in record], "emoji": emoji}
+
+    def _event_log_source(self, name: str, start: datetime, end: datetime, owner: str) -> Sequence[datetime]:
+        stmt = sal.select(EventLog.create_time).where(
+            EventLog.owner == owner,
+            EventLog.create_time > start,
+            EventLog.create_time < end,
+            sal.or_(EventLog.msg.like(f"%完成%{name}%"), EventLog.msg.like(f"%补卡%{name}%")),
+        )
+        return self.db.scalars(stmt).all()
+
+    def _weight_log_source(self, name: str, start: datetime, end: datetime, owner: str) -> Sequence[datetime]:
+        if "体重" not in name:
+            return []
+        stmt = sal.select(WeightLog.create_time).where(
+            WeightLog.owner == owner,
+            WeightLog.create_time > start,
+            WeightLog.create_time < end,
+        )
+        return self.db.scalars(stmt).all()
+
+    def get_checkin_datetime(self, name: str, start: datetime, end: datetime, owner: str) -> Sequence[datetime]:
+        results: list[datetime] = []
+        for source in self._data_sources:
+            results.extend(source(name, start, end, owner))
+        # 按日期去重, 确保同一天多次打卡仅保留一次
+        seen: set[date] = set()
+        deduped: list[datetime] = []
+        for r in results:
+            d = r.date()
+            if d not in seen:
+                seen.add(d)
+                deduped.append(r)
+        return deduped
+
+    def today_checked(self, name: str, owner: str) -> bool:
+        begin = today_begin()
+        for source in self._data_sources:
+            if len(source(name, begin, now(), owner)) > 0:
+                return True
+        return False
+
+    def select_checkin_state(self, name: str, owner: str) -> CheckinState | None:
+        stmt = sal.select(CheckinState).where(CheckinState.item_name == name, CheckinState.owner == owner).limit(1)
+        return self.db.scalar(stmt)
+
+    def update_all_checkin_state(self):
+        users = self.config_manager.get_all_users()
+        end_day = today() - timedelta(days=1)
+        for user in users:
+            names = self._get_checkin_item_names(user)
+            for name in names:
+                self.update_checkin_state(name=name, end_day=end_day, owner=user)
+
+    def update_checkin_state(self, name: str, end_day: date, owner: str):
+        """注意: 不要混用datetime和date类型, 两者具有继承关系, 但无法进行比较"""
+        start = datetime(year=2025, month=1, day=1)
+        end = today_begin()
+        records = self.get_checkin_datetime(name, start, end, owner)
+
+        total_count = len(records)
+        checkin_dates: set[date] = set([r.date() for r in records])
+
+        # 连续打卡次数 & 最近未打卡日期
+        streak = 0
+        cursor = end_day
+        while cursor in checkin_dates:
+            streak += 1
+            cursor -= timedelta(days=1)
+
+        # 更新数据库
+        state = self.select_checkin_state(name, owner)
+        if state is None:
+            state = CheckinState(
+                owner=owner,
+                item_name=name,
+                total_count=total_count,
+                consecutive_days=streak,
+                start_prg_date=cursor,
+                progress=streak,
+            )
+            self.db.add(state)
+            self.db.flush()
+            return state
+
+        state.total_count = total_count
+        state.consecutive_days = streak
+        if state.start_prg_date >= cursor:
+            # 上次打卡起始日期位于有效区间内, 因此可以直接计算差值
+            state.progress = (end_day - state.start_prg_date).days
+        else:
+            state.start_prg_date = cursor
+            state.progress = streak
+
+        # 计算补卡相关逻辑
+        if state.progress >= MAKE_UP_DAYS:
+            state.start_prg_date += timedelta(days=MAKE_UP_DAYS)
+            state.make_up_count += 1
+            state.progress = 0
+
+        self.db.flush()
+        return state
+
+    def get_stat(self, name: str, owner: str) -> dict:
+        state = self.select_checkin_state(name, owner)
+        if state is None:
+            logger.info(f"[{owner}]: {name} 由于没有历史数据开始重新生成")
+            end_day = today() - timedelta(days=1)
+            state = self.update_checkin_state(name, end_day, owner)
+        if self.today_checked(name, owner):
+            return {
+                "total_count": state.total_count + 1,
+                "continuous_count": state.consecutive_days + 1,
+                "achievement_count": state.achievement_count,
+                "remaining_make_up": state.make_up_count,
+                "process": state.progress + 1,
+            }
+        else:
+            return {
+                "total_count": state.total_count,
+                "continuous_count": state.consecutive_days,
+                "achievement_count": state.achievement_count,
+                "remaining_make_up": state.make_up_count,
+                "process": state.progress,
+            }
+
+    def get_emoji(self, name: str) -> str:
+        for k, v in icon_map.items():
+            if k in name:
+                return v
+
+        return random.choice(normal_emoji)

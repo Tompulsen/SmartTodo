@@ -1,0 +1,89 @@
+from flask import Flask
+from sqlalchemy import create_engine
+from sqlalchemy.orm import scoped_session, sessionmaker
+
+from app.models.base import Base
+from app.services.assistant import AssistantManager
+from app.services.checkin_manager import CheckinManager
+from app.services.config_manager import ConfigManager
+from app.services.event_log_manager import EventManager
+from app.services.exercise_manager import ExerciseManager
+from app.services.interpreter import OpInterpreter
+from app.services.item_manager import ItemManager
+from app.services.task_manager import TaskManager
+from app.services.tomato_manager import TomatoManager, TomatoRecordManager
+from app.services.weight_manager import WeightManager
+from app.tools.gen import get_or_create_secret_key
+
+# 初始化数据库对象
+engine = create_engine(url="sqlite:///data/data.db", future=True)
+
+# 定义一个基于线程的Session: https://docs.sqlalchemy.org/en/20/orm/contextual.html
+# scoped_session内部使用线程局部变量对每个线程维护一个独立的Session对象. 通常将scoped_session的返回值视为一个函数, 通过函数调用获得内部维护的属于当前线程的Session对象
+# 但scoped_session的返回值本身也进行了代理操作, 可以直接视为一个Session对象
+# autocommit: 是否在执行完操作后立即自动提交, 通常由于多个操作需要构成一个事务, 因此关闭自动提交
+db = scoped_session(sessionmaker(autocommit=False, bind=engine))
+
+# 初始化Server层
+config_manager = ConfigManager()
+event_manager = EventManager(db)
+item_manager = ItemManager(event_manager)
+op_interpreter = OpInterpreter(item_manager)
+tomato_manager = TomatoManager(item_manager)
+tomato_record_manager = TomatoRecordManager(tomato_manager)
+checkin_manager = CheckinManager(config_manager, item_manager)
+weight_manager = WeightManager(event_manager)
+exercise_manager = ExerciseManager(event_manager)
+
+assistant_manager = AssistantManager(config_manager, tomato_record_manager)
+
+# 初始化定时任务
+task_manager = TaskManager(db)
+task_manager.add_daily_task("垃圾回收", item_manager.garbage_collection, "01:00")
+task_manager.add_daily_task("重置可重复任务", item_manager.reset_daily_task, "01:10")
+task_manager.add_daily_task("重置未完成的今日任务", item_manager.reset_today_task, "01:20")
+task_manager.add_daily_task("重置已完成的周期性任务", item_manager.renew_sp_task, "01:30")
+task_manager.add_daily_task("计算打卡相关统计数据", checkin_manager.update_all_checkin_state, "01:40")
+# 注意以下任务可能需要执行较长时间, 需要确保间隔时间充足
+task_manager.add_daily_task("个人助理记忆压缩与流言扩散", assistant_manager.auto_update_memory, "02:30")
+
+
+def create_app():
+    # 创建Flask应用实例
+    app = Flask(__name__)
+    app.secret_key = get_or_create_secret_key()
+
+    # 导入并注册蓝图
+    from app.views.checkin import checkin_bp
+    from app.views.exercise import exercise_bp
+    from app.views.file import file_bp
+    from app.views.focus import focus_bp
+    from app.views.item import item_bp
+    from app.views.llm import llm_bp
+    from app.views.login import login_bp
+    from app.views.meta import meta_bp
+    from app.views.note import note_bp
+    from app.views.planner import planner_bp
+    from app.views.tomato import tomato_bp
+    from app.views.weight import weight_bp
+
+    app.register_blueprint(file_bp)
+    app.register_blueprint(focus_bp)
+    app.register_blueprint(item_bp)
+    app.register_blueprint(login_bp)
+    app.register_blueprint(meta_bp)
+    app.register_blueprint(note_bp)
+    app.register_blueprint(planner_bp)
+    app.register_blueprint(tomato_bp)
+    app.register_blueprint(weight_bp)
+    app.register_blueprint(llm_bp)
+    app.register_blueprint(checkin_bp)
+    app.register_blueprint(exercise_bp)
+
+    # 初始化所有的表
+    Base.metadata.create_all(engine)
+
+    # 启动定时任务
+    task_manager.start()
+
+    return app

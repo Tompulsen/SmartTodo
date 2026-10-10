@@ -1,0 +1,20 @@
+{
+  "USER_INFO": {
+    "admin": {
+      "password": "123456",
+      "email": "admin@example.com",
+      "role": ["ROLE_ADMIN", "ROLE_USER"]
+    },
+    "user": {
+      "password": "123456",
+      "email": "user@example.com",
+      "role": ["ROLE_USER"]
+    }
+  },
+  "LLM_INFO": {
+    "BASE_URL": "https://api.siliconflow.cn/v1",
+    "API_KEY": "sk-xxx",
+    "MODEL_NAME": "deepseek-ai/DeepSeek-V4-Flash"
+  },
+  "VERSION": "3.0.0"
+}

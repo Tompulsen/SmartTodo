@@ -1,0 +1,13 @@
+.git
+.local
+.venv
+**/node_modules
+**/dist
+**/__pycache__
+**/*.pyc
+**/*.db
+data
+config/config.json
+config/secert.txt
+config/secret.txt
+.env*

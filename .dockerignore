@@ -11,3 +11,11 @@ config/config.json
 config/secert.txt
 config/secret.txt
 .env*
+**/.env*
+**/config/config.json
+**/config/secret.txt
+**/config/secert.txt
+**/data
+**/*.pem
+**/*.key
+**/*.log

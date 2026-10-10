@@ -1,5 +1,7 @@
 import os
 from os.path import join
+from pathlib import Path
+from uuid import uuid4
 
 from app.tools.log import logger
 from app.tools.web import download
@@ -8,10 +10,12 @@ FILE_FOLDER = "data/filebase"
 
 def create_upload_file(f):
     """将上传的文件保存到服务器"""
-    path = join(FILE_FOLDER, f.filename)
+    Path(FILE_FOLDER).mkdir(parents=True, exist_ok=True)
+    identifier = uuid4().hex
+    path = join(FILE_FOLDER, identifier)
     f.save(path)
-    url = path.replace("\\", "/").replace(FILE_FOLDER, '/file')
-    return f.filename, url
+    url = f"/file/{identifier}"
+    return (f.filename or "attachment").replace("\\", "/").rsplit("/", 1)[-1], url
 
 def create_download_file(file_url: str) -> str:
     """从指定的URL下载文件到服务器"""
@@ -19,7 +23,12 @@ def create_download_file(file_url: str) -> str:
     return path.replace(FILE_FOLDER, '/file').replace("\\", "/")
 
 def delete_file_from_url(url: str) -> bool:
-    filename = url.replace("/file", FILE_FOLDER)
+    if not url.startswith("/file/"):
+        return False
+    root = Path(FILE_FOLDER).resolve()
+    filename = (root / url.removeprefix("/file/")).resolve()
+    if not filename.is_relative_to(root):
+        return False
     try:
         os.remove(filename)
         return True

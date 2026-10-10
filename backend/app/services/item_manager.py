@@ -73,6 +73,10 @@ class ItemManager:
         self.on_delete_event: list[ItemEvent] = [remove_file_handler, remove_note_handler]
 
     def create(self, item: Item) -> Item:
+        if item.parent == 0:
+            item.parent = None
+        if item.parent is not None:
+            self.select_with_authority(item.parent, item.owner)
         for f in self.before_create_event:
             f(self.db, item)
 
@@ -209,9 +213,9 @@ class ItemManager:
             .limit(4)
             .scalar_subquery()
         )
-        stmt = sal.select(Item).where(Item.id.in_(sub))
+        stmt = sal.select(Item).where(Item.id.in_(sub), Item.owner == owner)
         items = self.db.scalars(stmt).all()
-        return [{"title": item.name, "path": f"note/{item.id}"} for item in items]
+        return [{"title": item.name, "path": f"/note/{item.id}"} for item in items]
 
     def undo(self, xid: int, owner: str):
         item = self.select_with_authority(xid=xid, owner=owner)

@@ -51,5 +51,52 @@ jobs:
       - run: python -m pip install -r backend/requirements.txt
       - name: Prepare isolated runtime directory
         run: mkdir -p data
-      - name: Test planners and focus timers
-        run: python -m unittest app.tests.services.planner_test app.tests.services.period_planner_test app.tests.services.focus_test -v
+      - name: Test accounts, planners and focus timers
+        run: python -m unittest app.tests.services.account_test app.tests.services.planner_test app.tests.services.period_planner_test app.tests.services.focus_test app.tests.services.production_test -v
+
+  image:
+    needs: [frontend, backend]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Image name
+        run: echo "IMAGE_NAME=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          load: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          build-args: VCS_REF=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Verify container startup
+        run: |
+          docker run -d --name smarttodo-ci \
+            -p 127.0.0.1:18080:8080 \
+            -e SMARTTODO_SCHEDULER=0 -e ENV=DEV \
+            "$IMAGE_NAME:latest"
+          trap 'docker logs smarttodo-ci; docker rm -f smarttodo-ci' EXIT
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:18080/api/health; then break; fi
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:18080/api/health
+          curl -fsS http://127.0.0.1:18080/login > /dev/null
+          curl -fsS http://127.0.0.1:18080/api/auth/session | \
+            python -c 'import json,sys; d=json.load(sys.stdin); assert not d["localMode"] and d["registrationEnabled"] and d["user"] is None'
+      - name: Publish image
+        run: docker image push --all-tags "$IMAGE_NAME"

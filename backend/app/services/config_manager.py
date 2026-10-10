@@ -10,6 +10,7 @@ class ConfigManager:
     __CONFIG_FOLDER = "config"
 
     def __init__(self):
+        self.account_db = None
         config_file = join(ConfigManager.__CONFIG_FOLDER, "config.json")
         if not exists(config_file):
             config_file = join(ConfigManager.__CONFIG_FOLDER, "default.json")
@@ -23,6 +24,10 @@ class ConfigManager:
         return username in users and users[username]["password"] == password
 
     def get_roles(self, username: str) -> list[str]:
+        if self.account_db is not None:
+            from app.models.account import Account
+            account = self.account_db.get(Account, username) if username else None
+            return (["ROLE_USER", "ROLE_ADMIN"] if account.is_admin else ["ROLE_USER"]) if account and account.active else []
         users: dict = self.config["USER_INFO"]
         if username in users:
             return users[username]["role"]
@@ -52,6 +57,10 @@ class ConfigManager:
         return info["BASE_URL"], info["API_KEY"], info["MODEL_NAME"]
 
     def get_all_users(self) -> Iterable[str]:
+        if self.account_db is not None:
+            from sqlalchemy import select
+            from app.models.account import Account
+            return list(self.account_db.scalars(select(Account.username).where(Account.active.is_(True))))
         users: dict = self.config["USER_INFO"]
         return users.keys()
 

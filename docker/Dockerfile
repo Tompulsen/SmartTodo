@@ -1,48 +1,37 @@
-FROM node:22.19.0-alpine as build-stage
-LABEL stage=builder
+FROM node:24-alpine AS frontend
+WORKDIR /build
+RUN corepack enable
+COPY web/package.json web/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+COPY web/ ./
+RUN pnpm run build
 
+FROM python:3.12-slim
+ARG VCS_REF=unknown
+LABEL org.opencontainers.image.source="https://github.com/Tompulsen/SmartTodo" \
+      org.opencontainers.image.title="SmartTodo" \
+      org.opencontainers.image.revision="${VCS_REF}"
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    TZ=Asia/Shanghai \
+    PORT=8080 \
+    SMARTTODO_WEB_ROOT=/app/web \
+    SMARTTODO_LOCAL_MODE=0
 WORKDIR /app
-COPY web/package.json web/package-lock.json ./
-# 设置 npm 镜像源（优先使用官方源，若仍慢可换为国内源）
-# 这里采用环境变量方式，方便通过 build-arg 覆盖
-ARG NPM_REGISTRY=https://registry.npmjs.org/
-RUN npm config set registry ${NPM_REGISTRY} && \
-    npm install
-
-COPY web .
-RUN npm run build
-
-# =====================
-
-FROM python:3.13-alpine
-
-ENV TZ Asia/Shanghai
-
-WORKDIR /app
-
-# 先执行依赖安装操作，后续如果依赖不变可以复用这一层
-COPY backend/requirements.txt /app/requirements.txt
-
-# 安装系统依赖和 Python 包，并清理缓存以减少镜像体积
-RUN apk add --no-cache --virtual .build-deps build-base && \
-    pip3 install --no-cache-dir -r requirements.txt && \
-    apk add --no-cache tzdata && \
-    apk add --no-cache nginx && \
-    apk del .build-deps
-
-# 复制前端编译文件到nginx默认路径
-COPY --from=build-stage /app/dist /web
-COPY docker/nginx.conf /etc/nginx/
-
-# 复制项目代码到容器的app目录
-COPY backend .
-
-VOLUME [ "/app/config", "/app/data"]
-
-EXPOSE 80
-
-CMD [ "sh", "-c", "nginx && python3 run.py" ]
-
-
-
+COPY backend/requirements*.txt ./
+RUN pip install --no-cache-dir -r requirements-production.txt \
+    && useradd --uid 10001 --create-home smarttodo \
+    && mkdir -p /app/data /app/config \
+    && chown -R smarttodo:smarttodo /app
+COPY --chown=smarttodo:smarttodo backend/ ./
+COPY --chown=smarttodo:smarttodo config/default.json /app/default-config.json
+COPY --chown=smarttodo:smarttodo --from=frontend /build/dist/ /app/web/
+COPY docker/entrypoint.sh /usr/local/bin/smarttodo-entrypoint
+COPY docker/gunicorn.conf.py /app/gunicorn.conf.py
+USER smarttodo
+EXPOSE 8080
+HEALTHCHECK --interval=20s --timeout=5s --start-period=40s --retries=3 \
+    CMD python -c "import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:'+os.environ.get('PORT','8080')+'/api/health',timeout=3)"
+ENTRYPOINT ["sh", "/usr/local/bin/smarttodo-entrypoint"]
+CMD ["gunicorn", "--config", "/app/gunicorn.conf.py", "wsgi:app"]
 

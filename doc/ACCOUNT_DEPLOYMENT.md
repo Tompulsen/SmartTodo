@@ -1,0 +1,91 @@
+# 账号版 Docker 部署
+
+## 当前状态
+
+已实现数据库账号、注册登录、CSRF 验证、登录频率限制、个人设置、密码哈希与会话撤销。
+数据库连接支持通过 `DATABASE_URL` 配置；数据库模型已通过 MySQL 建表语句编译检查。
+本地预览与接口测试使用 SQLite。首尔服务器已通过宝塔创建独立的 `smarttodo` 数据库，
+初始化 19 张表，并用项目专用数据库用户验证了 MySQL 连接；应用容器的 MySQL 连接尚待验证。
+
+生产依赖独立保存在 `backend/requirements-production.txt`：PyMySQL 用于连接 MySQL，
+Gunicorn 用于运行 Flask。生产镜像由 Node.js 24 构建前端，再使用 Python 3.12 运行账号版服务。
+一个 worker 配合 8 个线程，避免重复启动应用内的定时任务；容器使用非 root 用户运行。
+
+## 首次部署
+
+在宝塔创建独立的 MySQL 数据库和专用用户，字符集使用 `utf8mb4`，应用只使用此库的权限。
+然后在安装 Docker Compose 的 Linux 服务器上执行：
+
+```sh
+mkdir -p /www/wwwroot/smarttodo
+cd /www/wwwroot/smarttodo
+git clone https://github.com/Tompulsen/SmartTodo.git repository
+cp repository/docker/compose.yaml compose.yaml
+cp repository/docker/update.sh update.sh
+cp repository/docker/.env.example .env
+chmod 600 .env
+mkdir -p data runtime-config
+chown 10001:10001 data runtime-config
+chmod 700 data runtime-config
+```
+
+填写 `.env` 中的数据库密码和随机会话密钥后，运行 `sh update.sh`。
+容器仅监听 `127.0.0.1:18080`，通过 host 网络连接本机 MySQL。
+宝塔站点反向代理到此端口，配置示例见 `docker/baota-proxy.conf`。站点须开启 HTTPS。
+容器可在宝塔的 Docker 容器列表中管理，名称为 `smarttodo`。
+
+## 版本更新与回退
+
+每次推送 `main`，GitHub Actions 会测试代码、构建镜像并检查容器启动。
+检查通过后发布 `ghcr.io/tompulsen/smarttodo:latest` 和 `sha-完整提交号` 两种标签。
+首次发布后，须在 GitHub 的 Packages 设置中将此开源项目的容器包设为 Public，服务器才能匿名拉取。
+
+在部署目录执行 `sh update.sh` 即可拉取镜像并更新容器；`sh update.sh source` 则拉取源码后本地构建。
+源码更新使用 `git pull --ff-only`，发现本地修改会停止，不会覆盖修改。
+脚本等待新版本健康检查通过，失败时尝试恢复原镜像。
+需要指定版本时修改 `.env` 中的 `SMARTTODO_IMAGE` 为已发布的 `sha-完整提交号` 标签后更新。
+账号与任务保存在宝塔 MySQL 中，附件保存在 `data` 中，配置与会话密钥独立保存。
+不要删除这些持久目录或使用删除数据卷的命令进行更新。
+回退镜像不等于回退数据库；涉及数据库结构变更时，先备份并遵循该版本的迁移说明。
+
+## 首尔部署进度
+
+2026-10-10 已完成独立数据库、专用用户、19 张数据表、源码上传与校验。
+宝塔站点 `todo.zaiduyu.top` 已创建，反向代理目标为 `http://127.0.0.1:18080`，代理缓存关闭。
+站点反向代理配置保存在 `docker/baota-proxy.conf`，配置检查及 Nginx 重载通过。
+
+用户已添加 `todo.zaiduyu.top` 的 DNS 记录。2026-10-10 查询两台 Cloudflare 权威 DNS，
+均返回首尔源站 IP，当前观测为仅 DNS，尚未观测到橙云代理生效。
+Cloudflare API 令牌的来源 IP 限制仍拒绝当前客户端，因此未通过 API 修改代理或 TLS 模式。
+
+已通过宝塔签发并安装 Let's Encrypt HTTPS 证书，启用宝塔 ACME 自动续期和 HTTP 到 HTTPS 跳转。
+公网请求验证：HTTP 返回 `301` 跳转至 HTTPS，HTTPS 证书校验通过，返回预期的准备中 `503`。
+Nginx 配置检查通过，现有容器保持健康。Cloudflare 代理及其到源站的严格 TLS 校验仍待验证。
+Docker 镜像发布和容器部署正在验证；实际状态以容器健康检查及 `/api/health` 为准。
+后端不可达时，站点返回 `503` 和 `no-store`，这不代表应用已经上线。
+
+## 配置变量
+
+| 变量 | 用途 |
+| --- | --- |
+| `DATABASE_URL` | SQLAlchemy 连接地址，默认 `sqlite:///data/data.db`；MySQL 形式为 `mysql+pymysql://用户:经URL编码的密码@127.0.0.1:3306/smarttodo?charset=utf8mb4` |
+| `SMARTTODO_SECRET_KEY` | 至少 32 个字符的随机会话签名密钥；未设置时使用配置目录内持久化生成的密钥 |
+| `SMARTTODO_LOCAL_MODE` | 服务器必须为 `0`；本机免登录启动器会设为 `1` |
+| `SMARTTODO_REGISTRATION` | `1` 开放注册，`0` 关闭新注册，已有账号仍可登录 |
+| `SMARTTODO_SECURE_COOKIE` | HTTPS 生产环境设为 `1`；本机 HTTP 预览设为 `0` |
+| `SMARTTODO_TRUST_PROXY` | 只有应用仅能被可信反向代理访问时才设为 `1`，信任一层代理 |
+| `SMARTTODO_ADMIN_USER` | 可选的首次管理员用户名，4–15 位字母、数字或下划线，字母开头 |
+| `SMARTTODO_ADMIN_PASSWORD` | 与管理员用户名成对提供，至少 10 位；已有账号不会被自动覆盖或提权 |
+| `SMARTTODO_SCHEDULER` | `1` 启用原有后台任务，`0` 关闭；测试中应关闭 |
+
+数据库账号的密码应使用随机字符串，不能复用宝塔或服务器管理密码。
+管理账号必须由上述初始化配置建立；公开注册始终得到普通账号。
+首次初始化后可从运行环境移除管理员明文密码，登录校验使用数据库中的密码哈希。
+
+## 文件与旧配置
+
+- `/file/` 必须转发给后端进行账号检查，不能用 Nginx 的公共目录映射绕过权限。
+- 服务器账号模式不自动访问用户提交的 URL，也不代用户下载远程文件，防止访问服务器内部网络。
+- 用户可以上传本地附件，最大请求体为 8 MiB；上传文件以随机名称保存并作为附件下载。
+- `config/default.json` 中的历史示例用户仅用于本机模式；服务器账号由 `account` 表管理。
+- 不要直接公开已有本地数据库。需要保留历史数据时，先备份并明确旧数据所有者与新账号的对应关系。

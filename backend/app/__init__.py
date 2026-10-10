@@ -1,8 +1,15 @@
+import os
+from pathlib import Path
+
+Path("data").mkdir(exist_ok=True)
+Path("config").mkdir(exist_ok=True)
+
 from flask import Flask
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 
 from app.models.base import Base
+from app.services.account_manager import AccountManager
 from app.services.assistant import AssistantManager
 from app.services.checkin_manager import CheckinManager
 from app.services.config_manager import ConfigManager
@@ -16,13 +23,15 @@ from app.services.weight_manager import WeightManager
 from app.tools.gen import get_or_create_secret_key
 
 # 初始化数据库对象
-engine = create_engine(url="sqlite:///data/data.db", future=True)
+engine = create_engine(url=os.environ.get("DATABASE_URL", "sqlite:///data/data.db"),
+                       future=True, pool_pre_ping=True, pool_recycle=1800)
 
 # 定义一个基于线程的Session: https://docs.sqlalchemy.org/en/20/orm/contextual.html
 # scoped_session内部使用线程局部变量对每个线程维护一个独立的Session对象. 通常将scoped_session的返回值视为一个函数, 通过函数调用获得内部维护的属于当前线程的Session对象
 # 但scoped_session的返回值本身也进行了代理操作, 可以直接视为一个Session对象
 # autocommit: 是否在执行完操作后立即自动提交, 通常由于多个操作需要构成一个事务, 因此关闭自动提交
 db = scoped_session(sessionmaker(autocommit=False, bind=engine))
+account_manager = AccountManager(db)
 
 # 初始化Server层
 config_manager = ConfigManager()
@@ -52,6 +61,8 @@ def create_app():
     # 创建Flask应用实例
     app = Flask(__name__)
     app.secret_key = get_or_create_secret_key()
+    from app.security import configure_security
+    configure_security(app, db)
 
     # 导入并注册蓝图
     from app.views.checkin import checkin_bp
@@ -80,10 +91,30 @@ def create_app():
     app.register_blueprint(checkin_bp)
     app.register_blueprint(exercise_bp)
 
+    @app.teardown_appcontext
+    def remove_session(exception=None):
+        try:
+            if exception is None:
+                db.commit()
+            else:
+                db.rollback()
+        finally:
+            db.remove()
+
+    @app.get("/api/health")
+    def health():
+        from sqlalchemy import text
+        db.execute(text("SELECT 1"))
+        return {"status": "ok", "application": "SmartTodo"}
+
     # 初始化所有的表
     Base.metadata.create_all(engine)
+    config_manager.account_db = None if app.config["LOCAL_MODE"] else db
+    if not app.config["LOCAL_MODE"]:
+        account_manager.bootstrap(os.environ.get("SMARTTODO_ADMIN_USER"), os.environ.get("SMARTTODO_ADMIN_PASSWORD"))
 
     # 启动定时任务
-    task_manager.start()
+    if os.environ.get("SMARTTODO_SCHEDULER", "1") == "1" and not task_manager.is_alive():
+        task_manager.start()
 
     return app

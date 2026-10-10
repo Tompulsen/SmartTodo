@@ -1,18 +1,12 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
-import ts from 'typescript'
-
-const source = readFileSync(new URL('../src/components/planner/planner.ts', import.meta.url), 'utf8')
-const { outputText } = ts.transpileModule(source, {
-  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 }
-})
+import { sourceUrl } from './load-source.mjs'
 const {
   moveTask, moveTaskBy, weekDays, shiftDay, validDay, planCounts, dropBeforeTask, dragScrollSpeed,
   dueReminderTasks, reminderKey, taskTimeLabel, validPeriod, periodBounds, shiftPeriod, planPath, samePlan,
   scheduleEntries, scheduleLayout, monthCells, timeMinutes
 } =
-  await import(`data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`)
+  await import(sourceUrl('../src/components/planner/planner.ts'))
 
 const board = () => ({
   day: '2026-10-08', revision: 0, title: 'Plan',

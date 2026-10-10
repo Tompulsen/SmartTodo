@@ -1,0 +1,28 @@
+name: smarttodo
+services:
+  smarttodo:
+    image: ${SMARTTODO_IMAGE:-ghcr.io/tompulsen/smarttodo:latest}
+    container_name: smarttodo
+    restart: unless-stopped
+    network_mode: host
+    env_file:
+      - .env
+    environment:
+      PORT: "18080"
+      SMARTTODO_BIND: "127.0.0.1"
+      SMARTTODO_LOCAL_MODE: "0"
+      SMARTTODO_TRUST_PROXY: "1"
+      SMARTTODO_SECURE_COOKIE: "1"
+    volumes:
+      - ${SMARTTODO_DATA_DIR:-./data}:/app/data
+      - ${SMARTTODO_CONFIG_DIR:-./runtime-config}:/app/config
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    stop_grace_period: 35s

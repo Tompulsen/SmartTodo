@@ -13,7 +13,7 @@
       <header class="planner-header">
         <div class="brand-line"><span class="brand-word">SmartTodo<span class="brand-dot"></span></span><span class="brand-subtitle">把时间留给重要的事</span></div>
         <div class="header-actions">
-          <span class="save-status" role="status"><PlannerIcon :name="saving || loading ? 'clock' : 'saved'" />{{ saving ? '保存中' : loading ? '读取中' : error ? '保存状态异常' : '已保存至本地' }}</span>
+          <span class="save-status" role="status"><PlannerIcon :name="saving || loading ? 'clock' : 'saved'" />{{ saving ? '保存中' : loading ? '读取中' : error ? '保存状态异常' : auth.localMode ? '已保存至本地' : '已保存至账号' }}</span>
           <button class="icon-button reminder-button" :class="{ enabled: reminderPermission === 'granted' }"
             :aria-label="reminderControlLabel" :data-tip="reminderControlLabel" @click="enableReminders">
             <PlannerIcon :name="reminderIcon" />
@@ -286,6 +286,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { auth } from '@/auth'
 import PlannerIcon from '@/components/planner/PlannerIcon.vue'
 import PlannerDialog from '@/components/planner/PlannerDialog.vue'
 import PlannerTaskRow from '@/components/planner/PlannerTaskRow.vue'
@@ -301,7 +302,7 @@ const route = useRoute()
 const router = useRouter()
 const today = dayKey(new Date())
 const selectedDay = ref(validDay(route.query.date) ? route.query.date : today)
-const selectedPeriod = ref<PlanPeriod>(validPeriod(route.query.period) ? route.query.period : 'day')
+const selectedPeriod = ref<PlanPeriod>(validPeriod(route.query.period) ? route.query.period : auth.user?.preferences.defaultPeriod || 'day')
 const periods: { value: PlanPeriod; label: string }[] = [
   { value: 'day', label: '日' }, { value: 'week', label: '周' }, { value: 'month', label: '月' }, { value: 'year', label: '年' }
 ]
@@ -944,7 +945,7 @@ function beforeUnload(event: BeforeUnloadEvent) {
 }
 watch(() => [route.query.date, route.query.period], () => {
   const day = validDay(route.query.date) ? route.query.date : todayKey()
-  const period = validPeriod(route.query.period) ? route.query.period : 'day'
+  const period = validPeriod(route.query.period) ? route.query.period : auth.user?.preferences.defaultPeriod || 'day'
   if (day !== selectedDay.value || period !== selectedPeriod.value) {
     closeDialog()
     void loadDay(day, period)

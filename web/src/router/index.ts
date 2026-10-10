@@ -10,6 +10,7 @@ import Assistant from '@/view/AssistantPage.vue'
 import Index from '@/view/IndexPage.vue'
 import ExercisePage from '@/view/ExercisePage.vue'
 import { isLocalMode } from '@/local-mode'
+import { auth, loadSession } from '@/auth'
 
 const WeightPlanPage = () => import('@/view/WeightPlanPage.vue')
 const TodaySummaryPage = () => import('@/view/TodaySummaryPage.vue')
@@ -23,6 +24,8 @@ const router = createRouter({
     { path: '/index', component: Index },
     { path: '/tools', component: ToolsPage },
     { path: '/login', component: Login },
+    { path: '/register', component: Login },
+    { path: '/settings', component: () => import('@/view/SettingsPage.vue') },
     { path: '/todo', component: Todo },
     { path: '/note/:id', component: Todo },
     { path: '/log/', component: Message },
@@ -38,9 +41,14 @@ const router = createRouter({
   ]
 })
 
-router.beforeEach((to) => {
-  if (isLocalMode && to.path === '/login') {
+router.beforeEach(async (to) => {
+  if (!auth.ready) await loadSession()
+  const publicPage = ['/login', '/register'].includes(to.path)
+  if ((isLocalMode || auth.user) && publicPage) {
     return { path: '/index', replace: true }
+  }
+  if (!isLocalMode && !auth.user && !publicPage) {
+    return { path: '/login', query: { redirect: to.fullPath }, replace: true }
   }
 })
 

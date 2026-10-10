@@ -11,7 +11,7 @@
     <main class="planner-main focus-main">
       <header class="planner-header">
         <div class="brand-line"><router-link class="brand-word" to="/index">SmartTodo<span class="brand-dot"></span></router-link><span class="brand-subtitle">专注于此刻</span></div>
-        <div class="header-actions"><span class="save-status" role="status"><PlannerIcon :name="pending ? 'clock' : error ? 'note' : 'saved'" />{{ pending ? '保存中' : error ? '连接异常' : '本地专注' }}</span><button class="icon-button" aria-label="专注设置" data-tip="专注设置" @click="openSettings"><PlannerIcon name="settings" /></button></div>
+        <div class="header-actions"><span class="save-status" role="status"><PlannerIcon :name="pending ? 'clock' : error ? 'note' : 'saved'" />{{ pending ? '保存中' : error ? '连接异常' : auth.localMode ? '本地专注' : '已连接账号' }}</span><button class="icon-button" aria-label="专注设置" data-tip="专注设置" @click="openSettings"><PlannerIcon name="settings" /></button></div>
       </header>
       <div class="focus-page-heading">
         <div class="planner-tabs" role="tablist" aria-label="专注页面">
@@ -151,6 +151,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { auth } from '@/auth'
 import PlannerIcon from '@/components/planner/PlannerIcon.vue'
 import PlannerDialog from '@/components/planner/PlannerDialog.vue'
 import FocusAudio from '@/components/focus/FocusAudio.vue'

@@ -62,8 +62,8 @@ class History(Base):
     content: Mapped[str]                = mapped_column(Text, nullable=False, default='')
     create_time: Mapped[datetime]       = mapped_column(DateTime, nullable=False, default=now)
     system_inject_content: Mapped[str]  = mapped_column(Text, nullable=False, default='')   # 系统自动注入的待办相关信息
-    tool_call_list_json:Mapped[str]     = mapped_column(String, nullable=False, default='') # 模型请求工具调用信息序列化为JSON
-    tool_call_id:Mapped[str]            = mapped_column(String, nullable=False, default='') # 工具的ID
+    tool_call_list_json:Mapped[str]     = mapped_column(Text, nullable=False, default='') # 模型请求工具调用信息序列化为JSON
+    tool_call_id:Mapped[str]            = mapped_column(String(255), nullable=False, default='') # 工具的ID
     owner: Mapped[str]                  = mapped_column(String(15), nullable=False)
 
     assistant_name: Mapped[str]         = mapped_column(String(15), nullable=False, default='') # 助理的角色名

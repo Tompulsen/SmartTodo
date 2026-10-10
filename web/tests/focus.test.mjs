@@ -1,11 +1,8 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
-import ts from 'typescript'
+import { sourceUrl } from './load-source.mjs'
 
-const source = readFileSync(new URL('../src/components/focus/focus.ts', import.meta.url), 'utf8')
-const { outputText } = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 } })
-const { focusElapsed, focusSeconds, clockLabel } = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`)
+const { focusElapsed, focusSeconds, clockLabel } = await import(sourceUrl('../src/components/focus/focus.ts'))
 const base = { status: 'running', resumedAt: 1000000, elapsedMs: 0, duration: 1500 }
 
 test('focus countdown uses elapsed wall time, not the number of timer ticks', () => {

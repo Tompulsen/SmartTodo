@@ -64,6 +64,7 @@
 
 <script setup lang="ts">
 import axios from 'axios'
+import { apiFetch } from '@/http'
 import { ref, reactive, onMounted, onUnmounted, nextTick, watch, computed } from 'vue'
 
 // ---------- 类型定义 ----------
@@ -327,7 +328,7 @@ const streamChat = async (prompt: string) => {
   controller = new AbortController()
 
   try {
-    const response = await fetch('/api/stream/assistant/chat', {
+    const response = await apiFetch('/api/stream/assistant/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

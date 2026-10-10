@@ -1,4 +1,5 @@
 import html
+import os
 import re
 from urllib.parse import urlparse
 
@@ -25,6 +26,9 @@ def extract_host(url: str) -> str:
 
 # noinspection PyBroadException
 def extract_title(url: str) -> str:
+    # Public accounts must not cause requests into the server's private network.
+    if os.environ.get("SMARTTODO_LOCAL_MODE") != "1":
+        return url
     host = extract_host(url)
     if host != "":
         headers['Host'] = host
@@ -60,4 +64,7 @@ def parse_title(text: str) -> str:
 
 
 def download(url: str, base_dir: str):
+    if os.environ.get("SMARTTODO_LOCAL_MODE") != "1":
+        from werkzeug.exceptions import BadRequest
+        raise BadRequest("Remote downloads are disabled. Upload a local file instead.")
     return wget.download(url=url, out=base_dir)

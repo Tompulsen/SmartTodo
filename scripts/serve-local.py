@@ -12,6 +12,7 @@ WEB_ROOT = ROOT / "web" / "dist"
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=8080)
+    parser.add_argument("--accounts", action="store_true", help="Preview registration and login on loopback.")
     args = parser.parse_args()
 
     if not (WEB_ROOT / "index.html").is_file():
@@ -19,6 +20,7 @@ def main():
 
     os.chdir(ROOT)
     os.environ["ENV"] = "DEV"
+    os.environ["SMARTTODO_LOCAL_MODE"] = "0" if args.accounts else "1"
     (ROOT / "data").mkdir(exist_ok=True)
     sys.path.insert(0, str(ROOT / "backend"))
 
@@ -26,11 +28,11 @@ def main():
     from app import config_manager
     from run import app
 
-    local_user = next(
+    local_user = None if args.accounts else next(
         (user for user in config_manager.get_all_users() if config_manager.is_admin_user(user)),
         None,
     )
-    if local_user is None:
+    if not args.accounts and local_user is None:
         parser.error("Local mode requires a configured administrator to own the existing data.")
 
     @app.before_request
@@ -39,23 +41,17 @@ def main():
             abort(403)
 
         # Reuse the existing owner's data without requiring a browser login cookie.
-        session["username"] = local_user
-        session["role"] = config_manager.get_roles(local_user)
-        if request.path.rstrip("/") == "/login":
-            return redirect("/index")
-        if request.method == "POST":
-            if request.path == "/api/login":
-                return "True"
-            if request.path == "/api/logout":
-                return jsonify(True)
+        if not args.accounts:
+            session["username"] = local_user
+            session["role"] = config_manager.get_roles(local_user)
+            if request.path.rstrip("/") in {"/login", "/register"}:
+                return redirect("/index")
 
     @app.get("/_local/health")
     def local_health():
+        if args.accounts:
+            abort(404)
         return {"application": "SmartTodo", "mode": "local", "authentication_required": False}
-
-    @app.get("/file/<path:filename>")
-    def local_download(filename):
-        return send_from_directory(ROOT / "data" / "filebase", filename)
 
     @app.get("/", defaults={"path": ""})
     @app.get("/<path:path>")

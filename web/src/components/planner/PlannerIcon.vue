@@ -8,7 +8,7 @@ import {
   faArrowUp, faArrowDown, faTrashCan, faSliders, faBars, faHouse, faArrowLeft,
   faCircle, faRotateRight, faCloudArrowDown, faNoteSticky, faBullseye, faCircleCheck, faRepeat,
   faBell, faBellSlash, faPlay, faPause, faStop, faLeaf, faVolumeHigh, faVolumeXmark, faLink, faMinus,
-  faMusic, faArrowUpFromBracket, faPowerOff
+  faMusic, faArrowUpFromBracket, faPowerOff, faUser, faLock, faEye, faEyeSlash, faRightFromBracket, faShieldHalved
 } from '@fortawesome/free-solid-svg-icons'
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core'
 
@@ -22,6 +22,7 @@ const icons: Record<string, IconDefinition> = {
   note: faNoteSticky, focus: faBullseye, complete: faCircleCheck, repeat: faRepeat,
   bell: faBell, 'bell-slash': faBellSlash, play: faPlay, pause: faPause, stop: faStop,
   leaf: faLeaf, sound: faVolumeHigh, mute: faVolumeXmark, link: faLink, minus: faMinus,
-  music: faMusic, upload: faArrowUpFromBracket, power: faPowerOff
+  music: faMusic, upload: faArrowUpFromBracket, power: faPowerOff,
+  user: faUser, lock: faLock, eye: faEye, 'eye-slash': faEyeSlash, logout: faRightFromBracket, shield: faShieldHalved
 }
 </script>

@@ -1,3 +1,5 @@
+import { apiFetch } from '../../http'
+
 export type PlanColor = 'rose' | 'gold' | 'sage' | 'blue' | 'lilac' | 'teal'
 export type PlanPeriod = 'day' | 'week' | 'month' | 'year'
 export interface PlanTask {
@@ -250,7 +252,7 @@ export class PlanRequestError extends Error {
 }
 
 export async function planRequest<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`/api/planner${path}`, {
+  const response = await apiFetch(`/api/planner${path}`, {
     ...init,
     headers: { 'Content-Type': 'application/json', ...init?.headers },
     signal: AbortSignal.timeout(12000)

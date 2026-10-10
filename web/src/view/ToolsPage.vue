@@ -24,6 +24,7 @@ import PlannerIcon from '@/components/planner/PlannerIcon.vue'
 const recent = ref<{ title: string; path: string }[]>([])
 const tools = computed(() => [
   { title: '设置', path: '/settings', icon: 'settings', description: '个人资料、计划偏好与账号安全' },
+  ...(!auth.localMode ? [{ title: '待办关联', path: '/connect', icon: 'chat', description: '联系人、聊天与今日计划共享' }] : []),
   ...(!auth.localMode && auth.user?.isAdmin ? [{ title: '管理控制台', path: '/tools/admin', icon: 'shield', description: '用户资料、角色与账号状态' }] : []),
   { title: '待办事项', path: '/todo', icon: 'tasks', description: '待办、笔记与附件' },
   { title: '专注时钟', path: '/tomato', icon: 'clock', description: '专注计时与白噪音' },

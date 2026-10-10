@@ -15,6 +15,7 @@
 | 专注 | 正计时、番茄钟、倒计时；关联计划；暂停与恢复；专注记录和每日目标 |
 | 音频 | 八种内置合成环境音与旋律；本地音频导入、循环、音量和播放进度 |
 | 账号与设置 | 注册、登录、退出、修改昵称与密码；默认计划周期；账号数据隔离 |
+| 待办关联 | 双方确认联系人、私聊、未读消息、分享今日计划快照、授权查看今日计划与撤回分享 |
 | 原有工具 | 旧版番茄任务、便签、统计、打卡、体重记录与可选 AI 助手 |
 
 ## 本地运行
@@ -81,6 +82,17 @@ macOS / Linux 可创建 `.venv`、安装同一依赖并构建前端，然后运�
 已有本地数据的用户名不能被公开注册领取；旧数据迁移需要由部署管理员单独安排。
 此预览仅监听本机，仍是开发服务。正式 Docker 部署及配置变量见 [部署说明](doc/ACCOUNT_DEPLOYMENT.md)。
 
+### 待办关联
+
+登录账号后，从左侧「关联」或工具箱进入 `/connect`。输入对方的注册账号发送邀请，对方接受后即可聊天。
+桌面端显示联系人、聊天和今日计划三栏；手机端可在联系人、对话和共享计划之间切换。
+
+- 「分享今日计划」发送当前计划快照，默认不包含任务备注，可主动勾选包含备注，也可撤回分享。
+- 为某位联系人开启「共享我的今日计划」后，对方可查看当天的任务、时间和完成状态，不含备注；双方的共享权限相互独立。
+- 计划只读，联系人不能编辑你的任务。关闭共享或移除联系人后，后端立即拒绝相关访问。
+- 页面在可见时每 5 秒更新消息、未读数和共享状态；聊天记录保存到数据库，支持读取更早消息。
+- 移除联系人会同时清空双方的聊天记录。免登录本地模式不开放关联功能。
+
 ### 管理控制台
 
 账号版的管理员在工具箱中可以看到「管理控制台」，地址为 `/tools/admin`。
@@ -120,7 +132,7 @@ cd ..
 ```powershell
 New-Item -ItemType Directory -Path data -Force
 $env:PYTHONPATH = Join-Path $PWD 'backend'
-.\.venv\Scripts\python.exe -m unittest app.tests.services.account_test app.tests.services.admin_test app.tests.services.planner_test app.tests.services.period_planner_test app.tests.services.focus_test -v
+.\.venv\Scripts\python.exe -m unittest app.tests.services.account_test app.tests.services.admin_test app.tests.services.connection_test app.tests.services.planner_test app.tests.services.period_planner_test app.tests.services.focus_test -v
 ```
 
 GitHub Actions 会运行前端测试、类型检查、构建，以及上述后端测试。`main` 分支检查通过后，

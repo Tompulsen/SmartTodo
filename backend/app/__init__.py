@@ -67,6 +67,7 @@ def create_app():
     # 导入并注册蓝图
     from app.views.admin import admin_bp
     from app.views.checkin import checkin_bp
+    from app.views.connections import connections_bp
     from app.views.exercise import exercise_bp
     from app.views.file import file_bp
     from app.views.focus import focus_bp
@@ -91,6 +92,7 @@ def create_app():
     app.register_blueprint(weight_bp)
     app.register_blueprint(llm_bp)
     app.register_blueprint(checkin_bp)
+    app.register_blueprint(connections_bp)
     app.register_blueprint(exercise_bp)
 
     @app.teardown_appcontext

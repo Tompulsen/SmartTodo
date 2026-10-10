@@ -6,6 +6,7 @@
       <router-link class="rail-item" to="/index?view=schedule"><PlannerIcon name="grid" /><span>视图</span></router-link>
       <router-link class="rail-item selected" to="/tomato" aria-current="page"><PlannerIcon name="clock" /><span>专注</span></router-link>
       <button class="rail-item" @click="showRecords"><PlannerIcon name="chart" /><span>统计</span></button>
+      <router-link class="rail-item" to="/connect"><PlannerIcon name="chat" /><span>关联</span></router-link>
       <router-link class="rail-item rail-tools" to="/tools"><PlannerIcon name="settings" /><span>工具箱</span></router-link>
     </aside>
     <main class="planner-main focus-main">
@@ -102,7 +103,7 @@
       <router-link to="/index"><PlannerIcon name="calendar" /><span>计划</span></router-link>
       <router-link to="/index?view=schedule"><PlannerIcon name="grid" /><span>视图</span></router-link>
       <router-link to="/tomato" class="selected" aria-current="page"><PlannerIcon name="clock" /><span>专注</span></router-link>
-      <button @click="showRecords"><PlannerIcon name="chart" /><span>统计</span></button>
+      <router-link to="/connect"><PlannerIcon name="chat" /><span>关联</span></router-link>
       <router-link to="/tools"><PlannerIcon name="settings" /><span>工具箱</span></router-link>
     </nav>
     <audio ref="alarm" class="focus-alarm" :src="alarmSound" preload="auto"></audio>

@@ -6,6 +6,7 @@
       <button class="rail-item" :class="{ selected: scheduleView }" :aria-current="scheduleView ? 'page' : undefined" @click="setScheduleView(true)"><PlannerIcon name="grid" /><span>视图</span></button>
       <router-link class="rail-item" to="/tomato"><PlannerIcon name="clock" /><span>专注</span></router-link>
       <button class="rail-item" @click="openDialog('stats')"><PlannerIcon name="chart" /><span>统计</span></button>
+      <router-link class="rail-item" to="/connect"><PlannerIcon name="chat" /><span>关联</span></router-link>
       <router-link class="rail-item rail-tools" to="/tools"><PlannerIcon name="settings" /><span>工具箱</span></router-link>
     </aside>
 
@@ -14,6 +15,7 @@
         <div class="brand-line"><span class="brand-word">SmartTodo<span class="brand-dot"></span></span><span class="brand-subtitle">把时间留给重要的事</span></div>
         <div class="header-actions">
           <span class="save-status" role="status"><PlannerIcon :name="saving || loading ? 'clock' : 'saved'" />{{ saving ? '保存中' : loading ? '读取中' : error ? '保存状态异常' : auth.localMode ? '已保存至本地' : '已保存至账号' }}</span>
+          <button class="icon-button" aria-label="统计" data-tip="统计" @click="openDialog('stats')"><PlannerIcon name="chart" /></button>
           <button class="icon-button reminder-button" :class="{ enabled: reminderPermission === 'granted' }"
             :aria-label="reminderControlLabel" :data-tip="reminderControlLabel" @click="enableReminders">
             <PlannerIcon :name="reminderIcon" />
@@ -149,7 +151,7 @@
       <button :class="{ selected: !scheduleView }" :aria-current="!scheduleView ? 'page' : undefined" @click="setScheduleView(false)"><PlannerIcon name="calendar" /><span>计划</span></button>
       <button :class="{ selected: scheduleView }" :aria-current="scheduleView ? 'page' : undefined" @click="setScheduleView(true)"><PlannerIcon name="grid" /><span>视图</span></button>
       <router-link to="/tomato"><PlannerIcon name="clock" /><span>专注</span></router-link>
-      <button @click="openDialog('stats')"><PlannerIcon name="chart" /><span>统计</span></button>
+      <router-link to="/connect"><PlannerIcon name="chat" /><span>关联</span></router-link>
       <router-link to="/tools"><PlannerIcon name="settings" /><span>工具箱</span></router-link>
     </nav>
 

@@ -16,6 +16,7 @@ const WeightPlanPage = () => import('@/view/WeightPlanPage.vue')
 const TodaySummaryPage = () => import('@/view/TodaySummaryPage.vue')
 const LongSummaryPage = () => import('@/view/LongSummaryPage.vue')
 const ToolsPage = () => import('@/view/ToolsPage.vue')
+const ConnectionsPage = () => import('@/view/ConnectionsPage.vue')
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -23,6 +24,7 @@ const router = createRouter({
     { path: '/', redirect: '/index' },
     { path: '/index', component: Index },
     { path: '/tools', component: ToolsPage },
+    { path: '/connect', component: ConnectionsPage },
     { path: '/login', component: Login },
     { path: '/register', component: Login },
     { path: '/settings', component: () => import('@/view/SettingsPage.vue') },

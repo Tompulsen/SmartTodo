@@ -4,8 +4,8 @@
       <header class="account-topbar"><router-link to="/index" class="account-brand">SmartTodo<span>.</span></router-link><router-link to="/index" class="account-back"><PlannerIcon name="back" />返回计划</router-link></header>
       <div class="account-heading"><div><p class="account-eyebrow">工作与生活</p><h1>工具箱</h1></div><router-link to="/settings" class="account-user"><PlannerIcon name="user" />{{ auth.user?.displayName || '设置' }}</router-link></div>
       <div class="tools-grid">
-        <router-link v-for="tool in tools" :key="tool.path" :to="tool.path" class="tool-entry" :class="{ 'tool-settings': tool.path === '/settings' }">
-          <PlannerIcon :name="tool.icon" /><div><h2>{{ tool.title }}</h2><p>{{ tool.description }}</p></div><PlannerIcon name="right" />
+        <router-link v-for="tool in tools" :key="tool.path" :to="tool.path" class="tool-entry" :class="{ 'tool-settings': tool.path === '/settings', 'tool-admin': tool.path === '/tools/admin' }">
+          <PlannerIcon :name="tool.icon" /><div><span v-if="tool.path === '/tools/admin'" class="tool-admin-label">管理员</span><h2>{{ tool.title }}</h2><p>{{ tool.description }}</p></div><PlannerIcon name="right" />
         </router-link>
       </div>
       <section v-if="recent.length" class="recent-notes"><h2>最近笔记</h2><div class="tools-grid">
@@ -24,6 +24,7 @@ import PlannerIcon from '@/components/planner/PlannerIcon.vue'
 const recent = ref<{ title: string; path: string }[]>([])
 const tools = computed(() => [
   { title: '设置', path: '/settings', icon: 'settings', description: '个人资料、计划偏好与账号安全' },
+  ...(!auth.localMode && auth.user?.isAdmin ? [{ title: '管理控制台', path: '/tools/admin', icon: 'shield', description: '用户资料、角色与账号状态' }] : []),
   { title: '待办事项', path: '/todo', icon: 'tasks', description: '待办、笔记与附件' },
   { title: '专注时钟', path: '/tomato', icon: 'clock', description: '专注计时与白噪音' },
   { title: '私人助理', path: '/assistant', icon: 'note', description: '对话与计划整理' },

@@ -26,6 +26,7 @@ const router = createRouter({
     { path: '/login', component: Login },
     { path: '/register', component: Login },
     { path: '/settings', component: () => import('@/view/SettingsPage.vue') },
+    { path: '/tools/admin', component: () => import('@/view/AdminPage.vue'), meta: { requiresAdmin: true } },
     { path: '/todo', component: Todo },
     { path: '/note/:id', component: Todo },
     { path: '/log/', component: Message },
@@ -49,6 +50,9 @@ router.beforeEach(async (to) => {
   }
   if (!isLocalMode && !auth.user && !publicPage) {
     return { path: '/login', query: { redirect: to.fullPath }, replace: true }
+  }
+  if (to.meta.requiresAdmin && (auth.localMode || !auth.user?.isAdmin)) {
+    return { path: '/tools', replace: true }
   }
 })
 

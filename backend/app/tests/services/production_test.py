@@ -28,7 +28,7 @@ class ProductionFrontendTests(unittest.TestCase):
         self.directory.cleanup()
 
     def test_client_routes_and_static_assets(self):
-        for path in ("/", "/login", "/register", "/settings"):
+        for path in ("/", "/login", "/register", "/settings", "/tools/admin"):
             with self.client.get(path) as response:
                 self.assertEqual(response.status_code, 200)
                 self.assertIn(b"SmartTodo test", response.data)

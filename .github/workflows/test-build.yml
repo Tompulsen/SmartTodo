@@ -52,7 +52,7 @@ jobs:
       - name: Prepare isolated runtime directory
         run: mkdir -p data
       - name: Test accounts, planners and focus timers
-        run: python -m unittest app.tests.services.account_test app.tests.services.planner_test app.tests.services.period_planner_test app.tests.services.focus_test app.tests.services.production_test -v
+        run: python -m unittest app.tests.services.account_test app.tests.services.admin_test app.tests.services.planner_test app.tests.services.period_planner_test app.tests.services.focus_test app.tests.services.production_test -v
 
   image:
     needs: [frontend, backend]

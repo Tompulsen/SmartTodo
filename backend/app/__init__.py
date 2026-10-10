@@ -65,6 +65,7 @@ def create_app():
     configure_security(app, db)
 
     # 导入并注册蓝图
+    from app.views.admin import admin_bp
     from app.views.checkin import checkin_bp
     from app.views.exercise import exercise_bp
     from app.views.file import file_bp
@@ -78,6 +79,7 @@ def create_app():
     from app.views.tomato import tomato_bp
     from app.views.weight import weight_bp
 
+    app.register_blueprint(admin_bp)
     app.register_blueprint(file_bp)
     app.register_blueprint(focus_bp)
     app.register_blueprint(item_bp)

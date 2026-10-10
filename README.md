@@ -81,6 +81,16 @@ macOS / Linux 可创建 `.venv`、安装同一依赖并构建前端，然后运�
 已有本地数据的用户名不能被公开注册领取；旧数据迁移需要由部署管理员单独安排。
 此预览仅监听本机，仍是开发服务。正式 Docker 部署及配置变量见 [部署说明](doc/ACCOUNT_DEPLOYMENT.md)。
 
+### 管理控制台
+
+账号版的管理员在工具箱中可以看到「管理控制台」，地址为 `/tools/admin`。
+支持搜索和分页查看用户、编辑昵称和默认计划、启用或停用账号、调整管理员角色、重置密码。
+普通用户不会看到入口；后台逐次校验数据库中的角色，普通用户即使直接请求管理接口也会被拒绝。
+管理员不能在控制台修改自己的账号，个人资料和密码从「设置」修改，避免误停用或移除最后一个管理员。
+管理修改会使被编辑用户的旧登录失效；并发编辑使用版本校验，过期资料不会覆盖新修改。
+账号管理不读取用户的私人计划和附件，也不自动迁移本地数据。
+初始管理员由部署环境的 `SMARTTODO_ADMIN_USER` / `SMARTTODO_ADMIN_PASSWORD` 创建；不要将真实密码提交到仓库。
+
 ## 数据与配置
 
 - 任务、计划和专注记录保存在运行时生成的 `data/data.db`。
@@ -110,7 +120,7 @@ cd ..
 ```powershell
 New-Item -ItemType Directory -Path data -Force
 $env:PYTHONPATH = Join-Path $PWD 'backend'
-.\.venv\Scripts\python.exe -m unittest app.tests.services.account_test app.tests.services.planner_test app.tests.services.period_planner_test app.tests.services.focus_test -v
+.\.venv\Scripts\python.exe -m unittest app.tests.services.account_test app.tests.services.admin_test app.tests.services.planner_test app.tests.services.period_planner_test app.tests.services.focus_test -v
 ```
 
 GitHub Actions 会运行前端测试、类型检查、构建，以及上述后端测试。`main` 分支检查通过后，

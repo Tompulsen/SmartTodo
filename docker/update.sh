@@ -24,12 +24,12 @@ case "$mode" in
         exit 1
         ;;
 esac
-if docker compose up -d --wait --wait-timeout 120 smarttodo; then
+if docker compose up -d --force-recreate --wait --wait-timeout 120 smarttodo; then
     echo "SmartTodo is healthy."
 else
     echo "Update failed; restoring the previous image."
     if [ -n "$previous" ]; then
-        SMARTTODO_IMAGE="$previous" docker compose up -d --wait --wait-timeout 120 smarttodo
+        SMARTTODO_IMAGE="$previous" docker compose up -d --force-recreate --wait --wait-timeout 120 smarttodo
     fi
     exit 1
 fi

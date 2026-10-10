@@ -45,10 +45,28 @@ chmod 700 data runtime-config
 GitHub 自动发布镜像，但不会自动替换服务器容器；服务器更新由部署管理员执行此脚本。
 源码更新使用 `git pull --ff-only`，发现本地修改会停止，不会覆盖修改。
 脚本等待新版本健康检查通过，失败时尝试恢复原镜像。
+更新和回退都会根据 Compose 配置重新创建容器，以恢复网络等可能被面板改动的运行设置。
 需要指定版本时修改 `.env` 中的 `SMARTTODO_IMAGE` 为已发布的 `sha-完整提交号` 标签后更新。
 账号与任务保存在宝塔 MySQL 中，附件保存在 `data` 中，配置与会话密钥独立保存。
 不要删除这些持久目录或使用删除数据卷的命令进行更新。
 回退镜像不等于回退数据库；涉及数据库结构变更时，先备份并遵循该版本的迁移说明。
+
+### 宝塔更新注意事项
+
+通过部署目录的 `sh update.sh` 更新，不要使用容器详情中的通用「升级容器」功能替代项目更新脚本。
+本项目依赖 `network_mode: host` 访问宝塔 MySQL；如果面板重新创建容器时改成 `bridge`，
+容器内的 `127.0.0.1` 就不再是服务器，日志会出现 `Can't connect to MySQL server on '127.0.0.1'`。
+Compose 配置、`.env`、数据目录和配置目录必须保留。host 网络下，宝塔端口映射显示 `--` 是正常的；
+应用实际只监听服务器 `127.0.0.1:18080`，由网站反向代理对外提供 HTTPS。
+
+如遇上述网络配置偏差，可在 `/www/wwwroot/smarttodo` 执行以下命令恢复，不删除数据库或挂载目录：
+
+```sh
+docker compose up -d --force-recreate --no-deps --pull never --wait --wait-timeout 120 smarttodo
+docker inspect smarttodo --format '{{.HostConfig.NetworkMode}} {{.State.Health.Status}}'
+```
+
+预期结果为 `host healthy`，随后再使用项目更新脚本拉取新版本。
 
 ## 首尔部署验证
 

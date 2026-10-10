@@ -5,7 +5,7 @@
 已实现数据库账号、注册登录、CSRF 验证、登录频率限制、个人设置、密码哈希与会话撤销。
 数据库连接支持通过 `DATABASE_URL` 配置；数据库模型已通过 MySQL 建表语句编译检查。
 本地预览与接口测试使用 SQLite。首尔服务器已通过宝塔创建独立的 `smarttodo` 数据库，
-初始化 19 张表，并用项目专用数据库用户验证了 MySQL 连接；应用容器的 MySQL 连接尚待验证。
+初始化 19 张表；生产容器已通过项目专用用户连接 MySQL，并验证账号、计划与附件的读写。
 
 生产依赖独立保存在 `backend/requirements-production.txt`：PyMySQL 用于连接 MySQL，
 Gunicorn 用于运行 Flask。生产镜像由 Node.js 24 构建前端，再使用 Python 3.12 运行账号版服务。
@@ -39,8 +39,10 @@ chmod 700 data runtime-config
 每次推送 `main`，GitHub Actions 会测试代码、构建镜像并检查容器启动。
 检查通过后发布 `ghcr.io/tompulsen/smarttodo:latest` 和 `sha-完整提交号` 两种标签。
 首次发布后，须在 GitHub 的 Packages 设置中将此开源项目的容器包设为 Public，服务器才能匿名拉取。
+当前 `ghcr.io/tompulsen/smarttodo` 已通过匿名镜像访问和服务器实际拉取验证。
 
 在部署目录执行 `sh update.sh` 即可拉取镜像并更新容器；`sh update.sh source` 则拉取源码后本地构建。
+GitHub 自动发布镜像，但不会自动替换服务器容器；服务器更新由部署管理员执行此脚本。
 源码更新使用 `git pull --ff-only`，发现本地修改会停止，不会覆盖修改。
 脚本等待新版本健康检查通过，失败时尝试恢复原镜像。
 需要指定版本时修改 `.env` 中的 `SMARTTODO_IMAGE` 为已发布的 `sha-完整提交号` 标签后更新。
@@ -48,20 +50,30 @@ chmod 700 data runtime-config
 不要删除这些持久目录或使用删除数据卷的命令进行更新。
 回退镜像不等于回退数据库；涉及数据库结构变更时，先备份并遵循该版本的迁移说明。
 
-## 首尔部署进度
+## 首尔部署验证
 
-2026-10-10 已完成独立数据库、专用用户、19 张数据表、源码上传与校验。
+2026-10-10 已完成独立数据库、专用用户、19 张数据表、GitHub 源码部署与镜像发布。
 宝塔站点 `todo.zaiduyu.top` 已创建，反向代理目标为 `http://127.0.0.1:18080`，代理缓存关闭。
 站点反向代理配置保存在 `docker/baota-proxy.conf`，配置检查及 Nginx 重载通过。
+
+生产容器名称为 `smarttodo`，镜像为 `ghcr.io/tompulsen/smarttodo:latest`，健康检查通过。
+容器以 UID `10001` 运行，监听地址确认仅为 `127.0.0.1:18080`，中国时区正确。
+部署目录为 `/www/wwwroot/smarttodo`，数据与配置分别挂载 `data` 和 `runtime-config`，
+MySQL 由宝塔管理，不放入应用容器。原有服务保持健康。
+
+已实际执行一次镜像拉取和容器替换，替换后验证原登录会话、日 / 周 / 月 / 年计划、
+每日必做规则、任务时间段、跨宫格位置、个人设置与上传附件均保留。
+公网注册、登录、密码修改、退出与账号数据隔离检查通过；电脑和手机页面检查未发现横向溢出。
+35 项前端测试、57 项后端测试及 GitHub 容器启动检查通过。
 
 用户已添加 `todo.zaiduyu.top` 的 DNS 记录。2026-10-10 查询两台 Cloudflare 权威 DNS，
 均返回首尔源站 IP，当前观测为仅 DNS，尚未观测到橙云代理生效。
 Cloudflare API 令牌的来源 IP 限制仍拒绝当前客户端，因此未通过 API 修改代理或 TLS 模式。
 
 已通过宝塔签发并安装 Let's Encrypt HTTPS 证书，启用宝塔 ACME 自动续期和 HTTP 到 HTTPS 跳转。
-公网请求验证：HTTP 返回 `301` 跳转至 HTTPS，HTTPS 证书校验通过，返回预期的准备中 `503`。
+公网请求验证：HTTP 返回 `301` 跳转至 HTTPS，HTTPS 证书校验通过；
+登录、注册页面及 `/api/health` 返回 `200`，未登录的数据请求返回 `401`。
 Nginx 配置检查通过，现有容器保持健康。Cloudflare 代理及其到源站的严格 TLS 校验仍待验证。
-Docker 镜像发布和容器部署正在验证；实际状态以容器健康检查及 `/api/health` 为准。
 后端不可达时，站点返回 `503` 和 `no-store`，这不代表应用已经上线。
 
 ## 配置变量

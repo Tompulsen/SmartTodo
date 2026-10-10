@@ -53,7 +53,7 @@ GitHub 自动发布镜像，但不会自动替换服务器容器；服务器更�
 
 ### 宝塔更新注意事项
 
-通过部署目录的 `sh update.sh` 更新，不要使用容器详情中的通用「升级容器」功能替代项目更新脚本。
+优先通过部署目录的 `sh update.sh` 更新。未安装下述兼容处理时，不要使用容器详情中的通用「升级容器」功能替代项目更新脚本。
 本项目依赖 `network_mode: host` 访问宝塔 MySQL；如果面板重新创建容器时改成 `bridge`，
 容器内的 `127.0.0.1` 就不再是服务器，日志会出现 `Can't connect to MySQL server on '127.0.0.1'`。
 Compose 配置、`.env`、数据目录和配置目录必须保留。host 网络下，宝塔端口映射显示 `--` 是正常的；
@@ -67,6 +67,26 @@ docker inspect smarttodo --format '{{.HostConfig.NetworkMode}} {{.State.Health.S
 ```
 
 预期结果为 `host healthy`，随后再使用项目更新脚本拉取新版本。
+
+### 宝塔升级入口兼容
+
+首尔面板当前版本的通用容器升级逻辑没有在创建容器时传入 `network_mode`，导致 host 容器变为 bridge。
+`docker/install-baota-upgrade-guard.py` 为此版本提供一个仅针对 SmartTodo 的兼容处理：
+容器名称与 Compose 项目均为 `smarttodo`，且执行的是升级操作时，调用部署目录的 `update.sh`，
+保留 Compose 网络、挂载、权限及健康检查和失败回退行为。其他容器及普通编辑操作保持原逻辑。
+
+管理员可在服务器执行：
+
+```sh
+cd /www/wwwroot/smarttodo
+python3 repository/docker/install-baota-upgrade-guard.py --check
+python3 repository/docker/install-baota-upgrade-guard.py
+```
+
+安装器先检查面板源码结构并备份原文件，再原子写入兼容处理；不匹配的面板版本会停止安装。
+已安装时重复执行不会重复插入。安装后可在宝塔「升级容器」选择 SmartTodo 的已发布镜像标签。
+宝塔自身升级可能覆盖这项兼容处理，面板更新后应重新执行 `--check`；项目更新脚本不受影响。
+此处理不会放宽 MySQL 网络权限，也不会修改数据库连接地址或其他容器。
 
 ## 首尔部署验证
 
